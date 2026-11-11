@@ -342,7 +342,12 @@ if ('mediaSession' in navigator) {
 function startSync(){
   var s = curSong(); if (!s) return;
   if (!s.lyrics.some(function(l){ return l.text; })) { toast('Adicione a letra antes de sincronizar'); lyricsEditor(s); return; }
-  state.sync = { idx: nextLine(s, 0) };
+  state.sync = {
+    idx: nextLine(s, 0),
+    originalTimes: s.lyrics.map(function(l){
+      return Object.prototype.hasOwnProperty.call(l, 't') ? { present:true, value:l.t } : { present:false };
+    })
+  };
   renderTools(); renderLyrics();
   centerLine(state.sync.idx, true);
   toast('Dê play e toque em “Marcar linha” no começo de cada verso');
@@ -380,6 +385,21 @@ function finishSync(silent){
   state.sync = null;
   if (s) save('songs', s).catch(function(){});
   if (!silent) { renderTools(); renderLyrics(); renderView(); renderMini(); }
+}
+function cancelSync(){
+  var s = curSong(), sy = state.sync;
+  if (!s || !sy) return;
+  clearTimeout(saveTimers[s.id]);
+  delete saveTimers[s.id];
+  s.lyrics.forEach(function(l, i){
+    var original = sy.originalTimes[i];
+    if (original && original.present) l.t = original.value;
+    else delete l.t;
+  });
+  state.sync = null;
+  save('songs', s).catch(function(){ toast('Não foi possível salvar a letra'); });
+  renderTools(); renderLyrics(); renderView(); renderMini();
+  toast('Sincronização cancelada');
 }
 
 /* ---------- Janelas ---------- */
@@ -675,6 +695,7 @@ $('#bSync').onclick = startSync;
 $('#sMark').onclick = markLine;
 $('#sUndo').onclick = undoLine;
 $('#sDone').onclick = function(){ finishSync(); toast('Sincronização salva'); };
+$('#sCancel').onclick = cancelSync;
 var sizes = ['s','m','l'];
 try { var sv = localStorage.getItem('ensaio-size'); if (sizes.indexOf(sv) >= 0) $('#lyrics').dataset.size = sv; } catch(e){}
 $('#bSize').onclick = function(){

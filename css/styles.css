@@ -117,6 +117,7 @@ textarea.field.notes-ta{min-height:9rem}
 .tool{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 4px;font-weight:700;font-size:.92rem;min-height:46px}
 .tool[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:transparent}
 .syncbar{display:grid;grid-template-columns:1fr 1.8fr 1fr;gap:8px}
+#sCancel{grid-column:1/-1}
 .mark{background:var(--btn);color:var(--btn-ink);border:0;border-radius:14px;font-weight:700;font-size:1.1rem;padding:18px 6px}
 
 /* Modal */
