@@ -1,4 +1,4 @@
-🎙️ Ensaio
+🎙️ Ensaio 🎙️
 
 Player de música para o celular, feito para estudar repertório: toque seus arquivos de áudio, acompanhe a letra sincronizada e repita ou desacelere os trechos difíceis.
 
