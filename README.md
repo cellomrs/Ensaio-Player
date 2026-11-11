@@ -2,7 +2,7 @@
 
 Player de música para o celular, feito para estudar repertório: toque seus arquivos de áudio, acompanhe a letra sincronizada e repita ou desacelere os trechos difíceis.
 
-Tudo roda no navegador, num único arquivo HTML. Nenhuma música, letra ou anotação sai do seu aparelho.
+Tudo roda no navegador, sem build nem dependências. Nenhuma música, letra ou anotação sai do seu aparelho.
 
 Funcionalidades
 
@@ -42,16 +42,16 @@ Abra a página no navegador do celular e toque em Adicionar músicas. O manual c
 
 Publicar a sua cópia (grátis)
 
-O app é um único arquivo, então qualquer hospedagem de site estático serve.
+O app usa arquivos estáticos, então qualquer hospedagem de site estático serve. Publique a pasta inteira, preservando a estrutura de arquivos.
 
 GitHub Pages
 
-Faça um fork deste repositório (ou crie um novo com o arquivo index.html).
+Faça um fork deste repositório (ou crie um novo com todos os arquivos do projeto).
 Vá em Settings → Pages.
 Em Source, escolha a branch main e a pasta / (root).
 Em poucos minutos o app estará em https://SEU-USUARIO.github.io/NOME-DO-REPOSITORIO/.
 
-Também funciona no Netlify Drop ou no Cloudflare Pages, arrastando a pasta com o arquivo.
+Também funciona no Netlify Drop ou no Cloudflare Pages, arrastando a pasta do projeto.
 
 O endereço precisa ser HTTPS para o armazenamento e os controles de mídia funcionarem. Todas as opções acima já usam HTTPS.
 
@@ -62,6 +62,16 @@ Músicas, letras, anotações e playlists ficam no IndexedDB do navegador, no ap
 Limpar os dados do navegador apaga tudo. Exporte antes as letras sincronizadas.
 No iPhone, o Safari pode apagar dados de sites pouco usados. Abrir o app com frequência ajuda.
 Os dados não passam de um endereço para outro nem de um celular para outro. Para levar uma letra, exporte o .lrc e importe no destino.
+Estrutura do projeto
+
+```text
+index.html
+css/
+  styles.css
+js/
+  app.js
+```
+
 Tecnologia
 HTML, CSS e JavaScript puros, sem build e sem dependências
 IndexedDB para guardar áudio e letras
