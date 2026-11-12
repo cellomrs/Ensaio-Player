@@ -142,6 +142,19 @@ textarea.field.notes-ta{min-height:9rem}
 .act.danger{color:var(--danger)}
 .m-actions{display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
 .grow{flex:1}
+.sheet p.small{font-size:.82rem}
+.imp-sum{margin:0 0 12px;padding-left:20px;color:var(--text);line-height:1.5;font-size:.95rem}
+.imp-sum li{margin-bottom:6px}
+
+/* Exportar / importar dados */
+.data-actions{display:flex;gap:8px;flex-wrap:wrap;padding:18px 6px 0}
+.empty-alt{margin-top:22px!important;font-size:.9rem}
+.link-btn{background:none;border:0;padding:0;color:var(--text);font-weight:700;text-decoration:underline;text-underline-offset:3px;font-size:inherit}
+.pending{margin:16px 6px 0;padding:14px 14px 6px;border:1px dashed var(--line);border-radius:14px}
+.pending h3{margin:0 0 6px;font-size:.98rem}
+.pending p{color:var(--muted);font-size:.85rem;line-height:1.45;margin:0 0 8px}
+.pending .pending-list{color:var(--text)}
+.pending .btn.ghost{padding-left:0}
 .field{width:100%;padding:12px 14px;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--text);font:inherit;font-size:16px}
 textarea.field{min-height:44vh;min-height:44dvh;line-height:1.5;resize:vertical}
 .pick{display:flex;align-items:center;gap:12px;padding:12px 4px;border-bottom:1px solid var(--line)}

@@ -9,9 +9,9 @@ var ICON = {
   down:'<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
 };
-var state = { songs:[], playlists:[], queue:[], qi:-1, queueName:'', view:'library', openPl:null, sync:null, adjust:null, loopA:null, loopB:null, rate:1 };
+var state = { songs:[], playlists:[], pending:[], queue:[], qi:-1, queueName:'', view:'library', openPl:null, sync:null, adjust:null, loopA:null, loopB:null, rate:1 };
 var db = null;
-var mem = { songs:new Map(), audio:new Map(), playlists:new Map() };
+var mem = { songs:new Map(), audio:new Map(), playlists:new Map(), pending:new Map() };
 var audio = new Audio();
 audio.preload = 'auto';
 var curUrl = null, playerOpen = false, seeking = false, lastActive = -2, userScrollAt = 0, wakeLock = null;
@@ -20,12 +20,12 @@ var reduceMotion = window.matchMedia && matchMedia('(prefers-reduced-motion: red
 /* ---------- Armazenamento (IndexedDB, só neste aparelho) ---------- */
 function openDB(){
   return new Promise(function(res, rej){
-    var r = indexedDB.open('ensaio', 1);
+    var r = indexedDB.open('ensaio', 2);
     r.onupgradeneeded = function(){
       var d = r.result;
-      d.createObjectStore('songs', {keyPath:'id'});
-      d.createObjectStore('audio', {keyPath:'id'});
-      d.createObjectStore('playlists', {keyPath:'id'});
+      ['songs', 'audio', 'playlists', 'pending'].forEach(function(n){
+        if (!d.objectStoreNames.contains(n)) d.createObjectStore(n, {keyPath:'id'});
+      });
     };
     r.onsuccess = function(){ res(r.result); };
     r.onerror = function(){ rej(r.error); };
@@ -148,10 +148,13 @@ function renderView(){
   }
   if (state.view === 'library') {
     if (!state.songs.length) {
-      m.innerHTML = '<div class="empty"><h2>Nenhuma música ainda</h2><p>Escolha arquivos de áudio do seu celular. Eles ficam guardados só neste aparelho, junto com as letras.</p><button class="btn" data-act="add">Adicionar músicas</button></div>';
+      m.innerHTML = '<div class="empty"><h2>Nenhuma música ainda</h2><p>Escolha arquivos de áudio do seu celular. Eles ficam guardados só neste aparelho, junto com as letras.</p><button class="btn" data-act="add">Adicionar músicas</button>' +
+        (state.pending.length ? '' : '<p class="empty-alt">Já tem um arquivo de dados exportado do Ensaio? <button class="link-btn" data-act="import">Importar dados</button></p>') + '</div>' + pendingBlock();
       return;
     }
-    m.innerHTML = sortedSongs().map(function(s){ return songRow(s); }).join('') + '<p class="foot" id="usage"></p>';
+    m.innerHTML = sortedSongs().map(function(s){ return songRow(s); }).join('') + pendingBlock() +
+      '<div class="data-actions"><button class="btn sec" data-act="export">Exportar dados</button><button class="btn sec" data-act="import">Importar dados</button></div>' +
+      '<p class="foot" id="usage"></p>';
     showUsage();
   } else if (state.view === 'playlists') {
     if (!state.playlists.length) {
@@ -159,8 +162,8 @@ function renderView(){
       return;
     }
     m.innerHTML = state.playlists.map(function(p){
-      var n = p.songIds.length;
-      return '<div class="row' + (state.queueName === p.name && curSong() ? ' playing' : '') + '"><button class="row-main" data-act="openpl" data-id="' + p.id + '"><span class="t">' + esc(p.name) + '</span><span class="s">' + n + (n === 1 ? ' música' : ' músicas') + '</span></button></div>';
+      var n = p.songIds.length, w = (p.pendingTitles || []).length;
+      return '<div class="row' + (state.queueName === p.name && curSong() ? ' playing' : '') + '"><button class="row-main" data-act="openpl" data-id="' + p.id + '"><span class="t">' + esc(p.name) + '</span><span class="s">' + n + (n === 1 ? ' música' : ' músicas') + (w ? ', ' + w + ' esperando o áudio' : '') + '</span></button></div>';
     }).join('');
   } else {
     var p = plById(state.openPl);
@@ -168,6 +171,7 @@ function renderView(){
     var html = '<div class="pl-actions">' + (p.songIds.length ? '<button class="btn" data-act="plplay">Tocar playlist</button>' : '') +
       '<button class="btn sec" data-act="pladd">Escolher músicas</button><button class="btn sec" data-act="plmore">Opções</button></div>';
     if (!p.songIds.length) html += '<div class="empty"><p>Esta playlist está vazia. Toque em “Escolher músicas” para montar a ordem.</p></div>';
+    if (p.pendingTitles && p.pendingTitles.length) html += '<p class="foot">Esperando o áudio: ' + esc(p.pendingTitles.map(function(x){ return x.title; }).join(', ')) + '. Ao adicionar um arquivo com o mesmo nome, ela entra na playlist sozinha.</p>';
     html += p.songIds.map(function(id, i){
       var s = songById(id); if (!s) return '';
       return songRow(s, { act:'plsong', i:i, pre:'<span class="num">' + (i+1) + '</span>',
@@ -445,17 +449,18 @@ function nudge(delta){
   var targets, lo, hi;
   if (adj.scope === 'line') {
     targets = [adj.idx];
-    lo = k > 0 ? s.lyrics[timed[k-1]].t : 0;
-    hi = k < timed.length - 1 ? s.lyrics[timed[k+1]].t : dur;
+    lo = k > 0 ? s.lyrics[timed[k-1]].t + 0.1 : 0;
+    hi = k < timed.length - 1 ? s.lyrics[timed[k+1]].t - 0.1 : dur;
   } else {
     targets = adj.scope === 'all' ? timed : timed.slice(k);
-    lo = adj.scope === 'all' || k === 0 ? 0 : s.lyrics[timed[k-1]].t;
+    lo = adj.scope === 'all' || k === 0 ? 0 : s.lyrics[timed[k-1]].t + 0.1;
     hi = dur;
   }
   var firstT = s.lyrics[targets[0]].t, lastT = s.lyrics[targets[targets.length-1]].t;
   var d = delta;
   if (firstT + d < lo) d = lo - firstT;
   if (lastT + d > hi) d = hi - lastT;
+  if (d * delta < 0) d = 0; /* já estava colado no vizinho: não anda para o lado contrário */
   d = +d.toFixed(2);
   if (d === 0) { toast(adj.scope === 'line' ? 'Não dá para passar do verso vizinho' : 'Chegou no limite'); return; }
   targets.forEach(function(i){ s.lyrics[i].t = Math.max(0, +(s.lyrics[i].t + d).toFixed(2)); });
@@ -638,9 +643,188 @@ $('#lrcFile').addEventListener('change', async function(e){
   var ta = $('#lyrTxt'); if (ta) ta.value = await f.text();
 });
 
+/* ---------- Exportar e importar dados (letras, observações, playlists; sem áudio) ---------- */
+function normTitle(t){ return String(t || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[_\s]+/g, ' ').trim().toLowerCase(); }
+function pendingBlock(){
+  if (!state.pending.length) return '';
+  var names = state.pending.slice().sort(function(a,b){ return a.title.localeCompare(b.title, 'pt-BR'); }).map(function(p){ return p.title; });
+  return '<div class="pending"><h3>Esperando o áudio (' + names.length + ')</h3><p>Letras importadas de músicas que ainda não estão neste aparelho. Adicione um arquivo de áudio com o mesmo nome e a letra entra sozinha.</p>' +
+    '<p class="pending-list">' + esc(names.join(' · ')) + '</p><button class="btn ghost" data-act="droppending">Descartar estas letras</button></div>';
+}
+function cleanLyrics(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(l){ return l && typeof l === 'object'; }).map(function(l){
+    var o = { text: typeof l.text === 'string' ? l.text.slice(0, 500) : '' };
+    if (typeof l.t === 'number' && isFinite(l.t) && l.t >= 0) o.t = +l.t.toFixed(2); else if ('t' in l) o.t = null;
+    if (typeof l.note === 'string' && l.note.trim()) o.note = l.note.slice(0, 200);
+    return o;
+  });
+}
+function buildExport(){
+  var songs = state.songs.map(function(s){
+    return { title:s.title, notes:s.notes || '', duration:s.duration || null, lyrics:cleanLyrics(s.lyrics) };
+  }).concat(state.pending.map(function(p){
+    return { title:p.title, notes:p.notes || '', duration:p.duration || null, lyrics:cleanLyrics(p.lyrics) };
+  }));
+  var playlists = state.playlists.map(function(p){
+    var order = p.songIds.map(function(id){ var s = songById(id); return s ? s.title : null; }).filter(Boolean);
+    (p.pendingTitles || []).slice().sort(function(a,b){ return a.pos - b.pos; }).forEach(function(x){ order.splice(Math.min(x.pos, order.length), 0, x.title); });
+    return { name:p.name, songs:order };
+  });
+  return { app:'ensaio', kind:'dados', version:1, exportedAt:new Date().toISOString(), songs:songs, playlists:playlists };
+}
+function downloadBlob(name, text, type){
+  var url = URL.createObjectURL(new Blob([text], { type:type }));
+  var a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+}
+function exportData(){
+  if (!state.songs.length && !state.pending.length) { toast('Ainda não há nada para exportar'); return; }
+  var data = buildExport(), text = JSON.stringify(data, null, 1);
+  var d = new Date(), pad = function(n){ return (n < 10 ? '0' : '') + n; };
+  var name = 'ensaio-dados-' + d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate()) + '.json';
+  var file = null, canShare = false;
+  try { file = new File([text], name, { type:'application/json' }); } catch(e){}
+  try { canShare = !!(file && navigator.canShare && navigator.canShare({ files:[file] })); } catch(e){}
+  var nS = data.songs.length, nP = data.playlists.length;
+  var withLyr = data.songs.filter(function(s){ return s.lyrics.length; }).length;
+  modal('<h2>Exportar dados</h2><p>Um arquivo com ' + nS + (nS === 1 ? ' música' : ' músicas') + ' (' + withLyr + ' com letra), as observações, as anotações nos versos e ' + nP + (nP === 1 ? ' playlist' : ' playlists') + '. ' +
+    '<b>Os áudios não vão junto</b>: no outro aparelho, importe este arquivo e adicione os áudios com os mesmos nomes.</p>' +
+    '<p class="small">Tamanho: ' + Math.max(1, Math.round(text.length / 1024)) + ' KB · ' + esc(name) + '</p>' +
+    '<div class="m-actions"><button class="btn ghost" data-m="x">Fechar</button><span class="grow"></span>' +
+    '<button class="btn' + (canShare ? ' sec' : '') + '" data-m="dl">Baixar arquivo</button>' +
+    (canShare ? '<button class="btn" data-m="share">Compartilhar</button>' : '') + '</div>');
+  $('#sheet').onclick = function(e){
+    var b = e.target.closest('[data-m]'); if (!b) return;
+    var m = b.dataset.m;
+    if (m === 'x') { closeModal(); return; }
+    if (m === 'share') {
+      navigator.share({ files:[file], title:'Dados do Ensaio' }).then(function(){ toast('Dados compartilhados'); })
+        .catch(function(err){ if (!err || err.name !== 'AbortError') toast('Não deu para compartilhar daqui. Use Baixar arquivo.'); });
+    } else if (m === 'dl') {
+      if (downloadsNs) {
+        downloadsNs.save({ filename: name + '.txt', data: text }).then(function(){ toast('Arquivo salvo'); })
+          .catch(function(err){ if (err && err.code === 'declined') return; toast('Não foi possível baixar o arquivo'); });
+      } else {
+        try { downloadBlob(name, text, 'application/json'); toast('Arquivo baixado'); } catch(err){ toast('Não foi possível baixar o arquivo'); }
+      }
+    }
+  };
+}
+function parseImport(text){
+  var data;
+  try { data = JSON.parse(text); } catch(e){ return null; }
+  if (!data || data.app !== 'ensaio' || !Array.isArray(data.songs)) return null;
+  return {
+    songs: data.songs.filter(function(s){ return s && typeof s.title === 'string' && s.title.trim(); }).map(function(s){
+      return { title:s.title.trim().slice(0, 120), notes: typeof s.notes === 'string' ? s.notes.slice(0, 1000) : '',
+        duration: typeof s.duration === 'number' && isFinite(s.duration) ? s.duration : null, lyrics:cleanLyrics(s.lyrics) };
+    }),
+    playlists: (Array.isArray(data.playlists) ? data.playlists : []).filter(function(p){ return p && typeof p.name === 'string' && p.name.trim() && Array.isArray(p.songs); }).map(function(p){
+      return { name:p.name.trim().slice(0, 120), songs:p.songs.filter(function(t){ return typeof t === 'string' && t.trim(); }) };
+    })
+  };
+}
+function matchSongs(titles){
+  /* Liga cada título importado a uma música daqui com o mesmo nome (sem diferença de maiúsculas, acentos ou _). */
+  var used = {}, out = {};
+  titles.forEach(function(t){
+    var k = normTitle(t);
+    if (k in out) return;
+    var s = state.songs.find(function(x){ return !used[x.id] && normTitle(x.title) === k; });
+    if (s) used[s.id] = true;
+    out[k] = s || null;
+  });
+  return out;
+}
+async function importData(text){
+  var data = parseImport(text);
+  if (!data) { toast('Este arquivo não é um arquivo de dados do Ensaio'); return; }
+  if (!data.songs.length && !data.playlists.length) { toast('O arquivo está vazio'); return; }
+  var match = matchSongs(data.songs.map(function(s){ return s.title; }));
+  var found = data.songs.filter(function(s){ return match[normTitle(s.title)]; });
+  var missing = data.songs.filter(function(s){ return !match[normTitle(s.title)]; });
+  var plSame = data.playlists.filter(function(p){ return state.playlists.some(function(x){ return normTitle(x.name) === normTitle(p.name); }); }).length;
+  var parts = [];
+  if (found.length) parts.push('<li><b>' + found.length + (found.length === 1 ? ' música' : ' músicas') + '</b> deste aparelho ' + (found.length === 1 ? 'recebe' : 'recebem') + ' a letra, as observações e as anotações do arquivo. O que elas têm hoje é substituído.</li>');
+  if (missing.length) parts.push('<li><b>' + missing.length + (missing.length === 1 ? ' música' : ' músicas') + '</b> ainda não ' + (missing.length === 1 ? 'está' : 'estão') + ' aqui. A letra fica esperando: ao adicionar um áudio com o mesmo nome, ela entra sozinha.</li>');
+  if (data.playlists.length) parts.push('<li><b>' + data.playlists.length + (data.playlists.length === 1 ? ' playlist' : ' playlists') + '</b>' + (plSame ? ' (' + plSame + ' com nome igual a uma daqui, que terá a ordem substituída)' : '') + '.</li>');
+  var ok = await new Promise(function(res){
+    modal('<h2>Importar dados</h2><ul class="imp-sum">' + parts.join('') + '</ul><p class="small">Os áudios não estão no arquivo. Nada é apagado deste aparelho.</p>' +
+      '<div class="m-actions"><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Importar</button></div>', function(){ res(false); });
+    $('#sheet').onclick = function(e){ var b = e.target.closest('[data-m]'); if (!b) return; closeModal(); res(b.dataset.m === 'ok'); };
+  });
+  if (!ok) return;
+  if (state.sync) finishSync(true);
+  if (state.adjust) finishAdjust(true);
+  try {
+    for (var i = 0; i < found.length; i++) {
+      var src = found[i], s = match[normTitle(src.title)];
+      s.lyrics = src.lyrics; s.notes = src.notes;
+      if (!s.duration && src.duration) s.duration = src.duration;
+      await save('songs', s);
+    }
+    for (var j = 0; j < missing.length; j++) {
+      var m = missing[j], pid = normTitle(m.title);
+      var pend = { id:pid, title:m.title, lyrics:m.lyrics, notes:m.notes, duration:m.duration };
+      await save('pending', pend);
+      state.pending = state.pending.filter(function(p){ return p.id !== pid; }).concat([pend]);
+    }
+    for (var k = 0; k < data.playlists.length; k++) {
+      var ip = data.playlists[k];
+      var pl = state.playlists.find(function(x){ return normTitle(x.name) === normTitle(ip.name); });
+      if (!pl) { pl = { id:uid(), name:ip.name, songIds:[] }; state.playlists.push(pl); }
+      var plMatch = matchSongs(ip.songs), ids = [], waiting = [];
+      ip.songs.forEach(function(t){
+        var s2 = plMatch[normTitle(t)];
+        if (s2 && ids.indexOf(s2.id) < 0) ids.push(s2.id);
+        else if (!s2) waiting.push({ title:t, pos:ids.length + waiting.length });
+      });
+      pl.songIds = ids;
+      if (waiting.length) pl.pendingTitles = waiting; else delete pl.pendingTitles;
+      await save('playlists', pl);
+    }
+  } catch(err) {
+    toast('A importação parou no meio: ' + (err && err.message ? err.message : 'erro ao salvar'));
+    render(); return;
+  }
+  render(); if (playerOpen) renderPlayer(); else renderMini();
+  toast('Dados importados');
+}
+async function applyPending(song){
+  var k = normTitle(song.title), changed = false;
+  var p = state.pending.find(function(x){ return x.id === k; });
+  if (p) {
+    song.title = p.title; song.lyrics = p.lyrics || []; song.notes = p.notes || '';
+    await save('songs', song);
+    state.pending = state.pending.filter(function(x){ return x !== p; });
+    await remove('pending', p.id);
+    changed = true;
+  }
+  for (var i = 0; i < state.playlists.length; i++) {
+    var pl = state.playlists[i], w = pl.pendingTitles || [];
+    var hit = w.find(function(x){ return normTitle(x.title) === k; });
+    if (!hit) continue;
+    /* pos é a posição na ordem completa; descontar as que ainda esperam antes dela */
+    var before = w.filter(function(x){ return x !== hit && x.pos < hit.pos; }).length;
+    pl.songIds.splice(Math.min(hit.pos - before, pl.songIds.length), 0, song.id);
+    pl.pendingTitles = w.filter(function(x){ return x !== hit; });
+    if (!pl.pendingTitles.length) delete pl.pendingTitles;
+    await save('playlists', pl);
+    changed = true;
+  }
+  return changed;
+}
+$('#dataFile').addEventListener('change', async function(e){
+  var f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  if (f.size > 20 * 1048576) { toast('Arquivo grande demais para ser de dados do Ensaio'); return; }
+  try { await importData(await f.text()); } catch(err){ toast('Não foi possível ler o arquivo'); }
+});
+
 /* ---------- Ações ---------- */
 async function addFiles(files){
-  var added = 0;
+  var added = 0, restored = 0;
   for (var i = 0; i < files.length; i++) {
     var f = files[i], id = uid();
     toast('Guardando ' + (i+1) + ' de ' + files.length + '…');
@@ -652,13 +836,15 @@ async function addFiles(files){
       else mem.audio.set(id, { id:id, buf:buf, type:f.type || 'audio/mpeg' });
       await save('songs', song);
       state.songs.push(song); added++;
+      try { if (await applyPending(song)) restored++; } catch(e){}
     } catch(err) {
       await remove('audio', id);
       toast('Sem espaço para guardar “' + f.name + '”');
       await new Promise(function(r){ setTimeout(r, 1500); });
     }
   }
-  if (added) toast(added === 1 ? 'Música adicionada' : added + ' músicas adicionadas');
+  if (added) toast((added === 1 ? 'Música adicionada' : added + ' músicas adicionadas') +
+    (restored ? (restored === 1 ? '. 1 recebeu a letra importada' : '. ' + restored + ' receberam a letra importada') : ''));
   render();
 }
 $('#file').addEventListener('change', function(e){ var fs = Array.from(e.target.files || []); e.target.value = ''; if (fs.length) addFiles(fs); });
@@ -715,6 +901,14 @@ document.addEventListener('click', async function(e){
   switch (act) {
     case 'tab': state.view = b.dataset.v; render(); $('#main').scrollTop = 0; break;
     case 'add': $('#file').click(); break;
+    case 'export': exportData(); break;
+    case 'import': $('#dataFile').value = ''; $('#dataFile').click(); break;
+    case 'droppending':
+      if (!(await confirmBox('Descartar as letras de ' + state.pending.length + (state.pending.length === 1 ? ' música que ainda não tem' : ' músicas que ainda não têm') + ' áudio aqui?', 'Descartar'))) break;
+      for (var dp = 0; dp < state.pending.length; dp++) await remove('pending', state.pending[dp].id);
+      state.pending = [];
+      for (var dq = 0; dq < state.playlists.length; dq++) { var dpl = state.playlists[dq]; if (dpl.pendingTitles) { delete dpl.pendingTitles; await save('playlists', dpl); } }
+      toast('Letras descartadas'); render(); break;
     case 'play': var list = sortedSongs().map(function(s){ return s.id; }); playQueue(list, list.indexOf(id), 'Todas as músicas'); break;
     case 'more': songMenu(id); break;
     case 'newpl': var np = await newPlaylist([]); if (np) { state.openPl = np.id; state.view = 'playlist'; render(); } break;
@@ -854,6 +1048,7 @@ audio.addEventListener('error', function(){ if (audio.src) toast('Este formato d
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch(e){}
   state.songs = (await loadAll('songs')).map(function(s){ s.lyrics = s.lyrics || []; return s; });
   state.playlists = await loadAll('playlists');
+  state.pending = await loadAll('pending');
   render();
   requestAnimationFrame(tick);
   try { if (window.claude && typeof window.claude.use === 'function') downloadsNs = await window.claude.use('downloads'); } catch(e){ downloadsNs = null; }

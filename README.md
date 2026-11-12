@@ -34,6 +34,11 @@ Anotações
 Observações gerais por música (tom, capotraste, estrutura)
 Anotações presas a um verso, como “entra a segunda voz”
 
+Backup e troca de celular
+
+Exportar dados: um arquivo .json pequeno com letras e tempos, observações, anotações nos versos e playlists (os áudios não vão junto, para o arquivo continuar leve)
+Importar dados: antes de mudar algo, mostra o que vai acontecer. Músicas com o mesmo nome recebem a letra do arquivo; as que ainda não estão no aparelho ficam “esperando o áudio” e a letra entra sozinha quando você adiciona um áudio com o mesmo nome, inclusive na posição certa da playlist
+
 Ajuda
 
 Manual de uso completo dentro do próprio app
@@ -62,9 +67,9 @@ Onde ficam os dados
 
 Músicas, letras, anotações e playlists ficam no IndexedDB do navegador, no aparelho e no endereço onde foram criadas.
 
-Limpar os dados do navegador apaga tudo. Exporte antes as letras sincronizadas.
+Limpar os dados do navegador apaga tudo. Antes, use Exportar dados (fim da aba Músicas).
 No iPhone, o Safari pode apagar dados de sites pouco usados. Abrir o app com frequência ajuda.
-Os dados não passam de um endereço para outro nem de um celular para outro. Para levar uma letra, exporte o .lrc e importe no destino.
+Os dados não passam sozinhos de um endereço para outro nem de um celular para outro. Para levar tudo, use Exportar dados, depois Importar dados no destino, e adicione os áudios com os mesmos nomes de arquivo.
 Estrutura do projeto
 
 ```text
@@ -90,4 +95,20 @@ Cada linha sincronizada começa com o tempo entre colchetes:
 [00:12.40]Primeiro verso da letra
 [00:17.85]Segundo verso da letra
 
-Observações e anotações não entram no .lrc, porque o formato não tem lugar para elas.
+Observações e anotações não entram no .lrc, porque o formato não tem lugar para elas. Para levá-las junto, use Exportar dados.
+
+Arquivo de dados (.json)
+
+```json
+{
+ "app": "ensaio", "kind": "dados", "version": 1,
+ "exportedAt": "2026-11-12T10:00:00.000Z",
+ "songs": [
+  { "title": "Nome da música", "notes": "Tom de Ré", "duration": 212.4,
+    "lyrics": [ { "text": "Primeiro verso", "t": 12.4, "note": "entra a segunda voz" } ] }
+ ],
+ "playlists": [ { "name": "Ensaio de sábado", "songs": ["Nome da música"] } ]
+}
+```
+
+Na importação, as músicas são ligadas pelo título, sem diferença de maiúsculas, acentos e “_”.

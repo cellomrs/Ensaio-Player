@@ -86,6 +86,7 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <input type="file" id="file" accept="audio/*" multiple hidden>
 <input type="file" id="lrcFile" accept=".lrc,.txt,text/plain" hidden>
+<input type="file" id="dataFile" accept=".json,application/json,.txt,text/plain" hidden>
 
 <template id="helpTpl">
 <div class="help">
@@ -98,6 +99,7 @@
 <li>Espere o aviso “Música adicionada”.</li>
 <li>Toque no nome de uma música para começar a tocar.</li>
 </ol>
+<p>Trocou de celular? Toque em <b>Importar dados</b> antes de adicionar as músicas. Veja “Onde ficam seus dados”.</p>
 <p>No menu <b>⋯</b> de cada música você pode renomear, editar a letra, adicionar observações, colocar numa playlist, exportar a letra ou excluir a música.</p>
 <p>Embaixo de cada nome aparece a duração e a situação da letra: <i>sem letra</i>, <i>letra sem tempos</i> ou <i>letra sincronizada</i>.</p>
 </div></details>
@@ -192,11 +194,20 @@
 <details><summary>Onde ficam seus dados</summary><div class="body">
 <p>Tudo fica no navegador deste celular e não aparece em outros aparelhos.</p>
 <ul>
-<li><b>Limpar os dados do navegador apaga tudo.</b> Exporte antes as letras sincronizadas.</li>
+<li><b>Limpar os dados do navegador apaga tudo.</b> Faça antes um backup com <b>Exportar dados</b>.</li>
 <li><b>No iPhone,</b> o Safari pode apagar dados de sites pouco usados. Abrir o Ensaio com frequência ajuda.</li>
 <li><b>Cada música ocupa o espaço do arquivo original.</b> O total aparece no fim da aba Músicas.</li>
-<li><b>Para usar em outro celular,</b> exporte as letras, importe lá e adicione os áudios de novo.</li>
 </ul>
+<h3>Exportar dados (backup)</h3>
+<p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as observações, as anotações nos versos e as playlists. <b>Os áudios não vão junto</b>, para o arquivo continuar leve. Guarde no Drive, mande para você mesmo por mensagem ou e-mail.</p>
+<h3>Importar dados</h3>
+<ol>
+<li>No outro celular (ou depois de limpar o navegador), toque em <b>Importar dados</b> e escolha o arquivo.</li>
+<li>O Ensaio mostra o que vai acontecer antes de mudar qualquer coisa.</li>
+<li>Músicas com o mesmo nome recebem a letra, as observações e as anotações do arquivo. O que elas tinham é substituído.</li>
+<li>As que ainda não estão no aparelho ficam em <b>Esperando o áudio</b>. Adicione os áudios com os mesmos nomes de arquivo e cada letra entra sozinha, inclusive na playlist.</li>
+</ol>
+<p>O nome é comparado sem diferença de maiúsculas, acentos e “_”. Se o arquivo de áudio tiver outro nome, renomeie o arquivo antes de adicionar.</p>
 </div></details>
 
 <details><summary>Problemas comuns</summary><div class="body">
