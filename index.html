@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Ensaio</title>
+<meta name="description" content="Player para estudar repertório: letra sincronizada, repetição de trechos e velocidade sem mudar o tom.">
 <meta name="theme-color" content="#E9EDF4">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="img/icon-192.png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ensaio">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <script>/* Aplica o tema escolhido antes de desenhar, para não piscar */try{var t=localStorage.getItem('ensaio-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -86,13 +95,24 @@
 
 <div id="modal" class="modal" hidden><div id="sheet" class="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="updateBar" class="update-bar" role="status" hidden><span>Nova versão do Ensaio disponível.</span><button class="btn" id="updateBtn">Atualizar</button><button class="icon-btn small" id="updateLater" aria-label="Agora não"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
 <input type="file" id="file" accept="audio/*" multiple hidden>
 <input type="file" id="lrcFile" accept=".lrc,.txt,text/plain" hidden>
 <input type="file" id="dataFile" accept=".json,application/json,.txt,text/plain" hidden>
 
 <template id="helpTpl">
 <div class="help">
-<p class="lead">O Ensaio toca seus arquivos de áudio, mostra a letra acompanhando a música e ajuda a repetir e desacelerar trechos. Tudo fica guardado só neste celular.</p>
+<div class="help-brand"><img src="img/logo-96.png" alt="" width="56" height="56"><p class="lead">O Ensaio toca seus arquivos de áudio, mostra a letra acompanhando a música e ajuda a repetir e desacelerar trechos. Tudo fica guardado só neste celular.</p></div>
+
+<details id="installHelp"><summary>Instalar no celular</summary><div class="body">
+<p>Instalado, o Ensaio ganha ícone na tela de início, abre em tela cheia e <b>funciona sem internet</b> (as músicas já ficam no aparelho).</p>
+<div id="installBox"></div>
+<h3>Android (Chrome)</h3>
+<p>Toque em <b>Instalar o app</b> acima. Se o botão não aparecer, abra o menu <b>⋮</b> do Chrome e escolha <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.</p>
+<h3>iPhone e iPad (Safari)</h3>
+<p>Toque em <b>Compartilhar</b> (o quadrado com a seta para cima) e depois em <b>Adicionar à Tela de Início</b>. No iPhone, o app instalado também fica protegido da limpeza automática de dados do Safari.</p>
+<p>As músicas e letras guardadas no navegador continuam valendo no app instalado, desde que seja o mesmo endereço.</p>
+</div></details>
 
 <details><summary>Primeiros passos</summary><div class="body">
 <ol>
@@ -205,7 +225,7 @@
 <p>Tudo fica no navegador deste celular e não aparece em outros aparelhos.</p>
 <ul>
 <li><b>Limpar os dados do navegador apaga tudo.</b> Faça antes um backup com <b>Exportar dados</b>.</li>
-<li><b>No iPhone,</b> o Safari pode apagar dados de sites pouco usados. Abrir o Ensaio com frequência ajuda.</li>
+<li><b>No iPhone,</b> o Safari pode apagar dados de sites pouco usados. Instalar o Ensaio na tela de início evita isso.</li>
 <li><b>O Ensaio guarda até 1 GB de áudio</b>, o que dá umas 100 a 200 músicas em MP3. Cada música ocupa o tamanho do arquivo original. No fim da aba <b>Músicas</b> aparece quanto já foi usado e quanto falta. Quando enche, exclua músicas que saíram do repertório; as letras podem ser guardadas antes com <b>Exportar dados</b>.</li>
 </ul>
 <h3>Exportar dados (backup)</h3>

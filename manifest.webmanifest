@@ -1,0 +1,20 @@
+{
+  "name": "Ensaio",
+  "short_name": "Ensaio",
+  "description": "Player para estudar repertório: letra sincronizada, repetição de trechos e velocidade sem mudar o tom. Funciona sem internet.",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#FDFBF6",
+  "theme_color": "#E9EDF4",
+  "categories": ["music", "education", "productivity"],
+  "icons": [
+    { "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "img/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

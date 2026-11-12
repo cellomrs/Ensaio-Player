@@ -121,7 +121,7 @@ function renderHeader(){
     var p = plById(state.openPl);
     h.innerHTML = '<button class="back" data-act="back">‹ Playlists</button>' + tb + '<h1 class="h-pl">' + esc(p ? p.name : '') + '</h1>';
   } else if (state.view === 'library') {
-    h.innerHTML = '<h1>Ensaio</h1><div class="hdr-actions">' + tb + (state.songs.length ? '<button class="btn" data-act="add">Adicionar músicas</button>' : '') + '</div>';
+    h.innerHTML = '<h1 class="brand"><img src="img/logo-96.png" alt="" width="40" height="40">Ensaio</h1><div class="hdr-actions">' + tb + (state.songs.length ? '<button class="btn" data-act="add">Adicionar músicas</button>' : '') + '</div>';
   } else if (state.view === 'help') {
     h.innerHTML = '<h1>Ajuda</h1><div class="hdr-actions">' + tb + '</div>';
   } else {
@@ -171,6 +171,7 @@ function renderView(){
   var m = $('#main');
   if (state.view === 'help') {
     if (!m.querySelector('.help')) m.innerHTML = $('#helpTpl').innerHTML;
+    renderInstall();
     return;
   }
   if (state.view === 'library') {
@@ -1042,6 +1043,7 @@ document.addEventListener('click', async function(e){
     case 'add': addRequest(); break;
     case 'export': exportData(); break;
     case 'theme': themeMenu(); break;
+    case 'install': doInstall(); break;
     case 'import': $('#dataFile').value = ''; $('#dataFile').click(); break;
     case 'droppending':
       if (!(await confirmBox('Descartar as letras de ' + state.pending.length + (state.pending.length === 1 ? ' música que ainda não tem' : ' músicas que ainda não têm') + ' áudio aqui?', 'Descartar'))) break;
@@ -1186,6 +1188,59 @@ audio.addEventListener('ended', function(){
 });
 audio.addEventListener('error', function(){ if (audio.src) toast('Este formato de áudio não toca neste aparelho'); });
 
+/* ---------- App instalável (PWA) ---------- */
+var installPrompt = null;
+function isInstalled(){
+  return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+}
+function renderInstall(){
+  var box = $('#installBox'); if (!box) return;
+  if (isInstalled()) { box.innerHTML = '<p class="install-ok">✓ Você já está usando o app instalado.</p>'; return; }
+  box.innerHTML = installPrompt ? '<button class="btn" data-act="install">Instalar o app</button>' : '';
+}
+window.addEventListener('beforeinstallprompt', function(e){
+  e.preventDefault(); installPrompt = e;   /* guarda para mostrar o botão só na Ajuda, sem barra intrusiva */
+  renderInstall();
+});
+window.addEventListener('appinstalled', function(){ installPrompt = null; renderInstall(); toast('Ensaio instalado na tela de início'); });
+async function doInstall(){
+  if (!installPrompt) { var d = $('#installHelp'); if (d) d.open = true; return; }
+  var p = installPrompt; installPrompt = null;
+  try { await p.prompt(); var r = await p.userChoice; if (r && r.outcome !== 'accepted') installPrompt = p; } catch(e){}
+  renderInstall();
+}
+
+/* Versão nova: o service worker novo espera; o app pergunta antes de trocar (não recarrega no meio de uma música) */
+var swWaiting = null, swReloading = false;
+function showUpdate(w){
+  swWaiting = w;
+  $('#updateBar').hidden = false;
+}
+$('#updateBtn').onclick = function(){
+  if (!swWaiting) return;
+  $('#updateBar').hidden = true;
+  swWaiting.postMessage('skipWaiting');
+};
+$('#updateLater').onclick = function(){ $('#updateBar').hidden = true; };
+function registerSW(){
+  if (!('serviceWorker' in navigator) || !/^https?:$/.test(location.protocol)) return;
+  navigator.serviceWorker.register('sw.js').then(function(reg){
+    if (reg.waiting && navigator.serviceWorker.controller) showUpdate(reg.waiting);
+    reg.addEventListener('updatefound', function(){
+      var w = reg.installing; if (!w) return;
+      w.addEventListener('statechange', function(){
+        if (w.state === 'installed' && navigator.serviceWorker.controller) showUpdate(w);
+      });
+    });
+    /* Procura versão nova ao voltar para o app */
+    document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') reg.update().catch(function(){}); });
+  }).catch(function(){});
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if (swReloading || !swWaiting) return;   /* primeira instalação: não recarrega */
+    swReloading = true; location.reload();
+  });
+}
+
 /* ---------- Início ---------- */
 (async function init(){
   try { db = await openDB(); }
@@ -1196,6 +1251,7 @@ audio.addEventListener('error', function(){ if (audio.src) toast('Este formato d
   state.pending = await loadAll('pending');
   render();
   backfillSizes().catch(function(){});
+  registerSW();
   requestAnimationFrame(tick);
   try { if (window.claude && typeof window.claude.use === 'function') downloadsNs = await window.claude.use('downloads'); } catch(e){ downloadsNs = null; }
 })();

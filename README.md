@@ -42,6 +42,11 @@ Backup e troca de celular
 Exportar dados: um arquivo .json pequeno com letras e tempos, observações, anotações nos versos e playlists (os áudios não vão junto, para o arquivo continuar leve)
 Importar dados: antes de mudar algo, mostra o que vai acontecer. Músicas com o mesmo nome recebem a letra do arquivo; as que ainda não estão no aparelho ficam “esperando o áudio” e a letra entra sozinha quando você adiciona um áudio com o mesmo nome, inclusive na posição certa da playlist
 
+App instalável (PWA)
+
+Instale na tela de início do celular: abre em tela cheia, com ícone próprio, e funciona sem internet
+Aviso “Nova versão disponível” quando o app é atualizado (só recarrega quando você toca em Atualizar, para não interromper uma música)
+
 Ajuda
 
 Manual de uso completo dentro do próprio app
@@ -64,7 +69,13 @@ Em poucos minutos o app estará em https://SEU-USUARIO.github.io/NOME-DO-REPOSIT
 
 Também funciona no Netlify Drop ou no Cloudflare Pages, arrastando a pasta do projeto.
 
-O endereço precisa ser HTTPS para o armazenamento e os controles de mídia funcionarem. Todas as opções acima já usam HTTPS.
+O endereço precisa ser HTTPS para o armazenamento, os controles de mídia e a instalação como app funcionarem. Todas as opções acima já usam HTTPS. Abrindo o index.html direto do disco (file://), o app funciona, mas não fica instalável nem disponível sem internet.
+
+Publicar uma atualização
+
+O service worker (sw.js) guarda os arquivos do app no aparelho. Ao publicar qualquer mudança em index.html, css/, js/ ou img/, aumente a VERSION no início do sw.js (por exemplo de ensaio-v1 para ensaio-v2). Sem isso, quem já instalou continua vendo a versão antiga. Com isso, o app mostra “Nova versão disponível” e atualiza quando a pessoa tocar em Atualizar. As músicas e letras não são afetadas.
+
+Se acrescentar um arquivo novo ao app (outro .js, .css ou imagem), inclua-o também na lista SHELL do sw.js.
 
 Onde ficam os dados
 
@@ -79,10 +90,19 @@ Estrutura do projeto
 
 ```text
 index.html
+manifest.webmanifest   dados do app instalável (nome, ícones, cores)
+sw.js                  service worker: funcionamento sem internet e atualizações
 css/
   styles.css
 js/
   app.js
+img/
+  logo.png             logo original (1254 px), fonte dos ícones; não é carregado pelo app
+  logo-96.png          logo do cabeçalho e da Ajuda
+  icon-192.png, icon-512.png                   ícones do app
+  icon-maskable-192.png, icon-maskable-512.png ícones com margem para o recorte do Android
+  apple-touch-icon.png  ícone do iPhone/iPad
+  favicon-32.png        ícone da aba do navegador
 ```
 
 Tecnologia
@@ -90,8 +110,9 @@ HTML, CSS e JavaScript puros, sem build e sem dependências
 IndexedDB para guardar áudio e letras
 Media Session API para os controles na tela de bloqueio
 Screen Wake Lock API para manter a tela acesa
-Web Share API para compartilhar o arquivo .lrc
-Fontes: Atkinson Hyperlegible e Bricolage Grotesque, via Google Fonts
+Web Share API para compartilhar o arquivo .lrc e o arquivo de dados
+Web App Manifest e Service Worker para instalar e usar sem internet
+Fontes: Atkinson Hyperlegible e Bricolage Grotesque, via Google Fonts (guardadas pelo service worker no primeiro acesso)
 Formato .lrc
 
 Cada linha sincronizada começa com o tempo entre colchetes:
