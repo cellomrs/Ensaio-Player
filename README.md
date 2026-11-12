@@ -67,6 +67,8 @@ Onde ficam os dados
 
 Músicas, letras, anotações e playlists ficam no IndexedDB do navegador, no aparelho e no endereço onde foram criadas.
 
+O app limita os áudios a 1 GB (cerca de 100 a 200 músicas em MP3), já que é feito para o repertório em ensaio, não para guardar uma coleção. O fim da aba Músicas mostra quanto foi usado e quanto falta; músicas que passariam do limite não são adicionadas. O limite fica na constante STORAGE_LIMIT em js/app.js.
+
 Limpar os dados do navegador apaga tudo. Antes, use Exportar dados (fim da aba Músicas).
 No iPhone, o Safari pode apagar dados de sites pouco usados. Abrir o app com frequência ajuda.
 Os dados não passam sozinhos de um endereço para outro nem de um celular para outro. Para levar tudo, use Exportar dados, depois Importar dados no destino, e adicione os áudios com os mesmos nomes de arquivo.

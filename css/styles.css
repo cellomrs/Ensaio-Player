@@ -146,6 +146,17 @@ textarea.field.notes-ta{min-height:9rem}
 .imp-sum{margin:0 0 12px;padding-left:20px;color:var(--text);line-height:1.5;font-size:.95rem}
 .imp-sum li{margin-bottom:6px}
 
+/* Espaço do app (limite de 1 GB) */
+.storage{margin:18px 6px 24px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.st-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:.88rem}
+.st-k{color:var(--muted)}
+.st-v{font-weight:700;font-variant-numeric:tabular-nums}
+.st-bar{height:8px;border-radius:999px;background:var(--surface2);border:1px solid var(--line);overflow:hidden}
+.st-bar span{display:block;height:100%;background:var(--btn);border-radius:999px;min-width:0;transition:width .3s}
+.st-free{margin:8px 0 0;color:var(--muted);font-size:.82rem;line-height:1.4}
+.storage.warn .st-bar span{background:var(--danger)}
+.storage.warn .st-free{color:var(--danger);font-weight:700}
+
 /* Exportar / importar dados */
 .data-actions{display:flex;gap:8px;flex-wrap:wrap;padding:18px 6px 0}
 .empty-alt{margin-top:22px!important;font-size:.9rem}

@@ -69,9 +69,9 @@ function fmt(t){ if (!isFinite(t) || t < 0) t = 0; var m = Math.floor(t/60), s =
 function stamp(t){ var m = Math.floor(t/60), s = (t - m*60).toFixed(2); return (m<10?'0':'') + m + ':' + (s.length<5?'0':'') + s; }
 function rateLabel(r){ return String(r).replace('.', ',') + '×'; }
 var toastTimer;
-function toast(msg){
+function toast(msg, ms){
   var el = $('#toast'); el.textContent = msg; el.classList.add('show');
-  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ el.classList.remove('show'); }, 2600);
+  clearTimeout(toastTimer); toastTimer = setTimeout(function(){ el.classList.remove('show'); }, ms || 2600);
 }
 function songById(id){ return state.songs.find(function(s){ return s.id === id; }); }
 function plById(id){ return state.playlists.find(function(p){ return p.id === id; }); }
@@ -154,7 +154,7 @@ function renderView(){
     }
     m.innerHTML = sortedSongs().map(function(s){ return songRow(s); }).join('') + pendingBlock() +
       '<div class="data-actions"><button class="btn sec" data-act="export">Exportar dados</button><button class="btn sec" data-act="import">Importar dados</button></div>' +
-      '<p class="foot" id="usage"></p>';
+      '<div id="usage"></div>';
     showUsage();
   } else if (state.view === 'playlists') {
     if (!state.playlists.length) {
@@ -182,12 +182,35 @@ function renderView(){
     m.innerHTML = html;
   }
 }
+/* Limite de espaço do próprio app: soma dos áudios guardados */
+var STORAGE_LIMIT = 1024 * 1048576; /* 1 GB */
+function usedBytes(){ return state.songs.reduce(function(n, s){ return n + (s.size || 0); }, 0); }
+function freeBytes(){ return Math.max(0, STORAGE_LIMIT - usedBytes()); }
+function fmtSize(b){
+  if (b >= 1024 * 1048576 * 0.995) return String(+(b / (1024 * 1048576)).toFixed(1)).replace('.', ',') + ' GB';
+  if (b > 0 && b < 1048576) return 'menos de 1 MB';
+  return Math.round(b / 1048576) + ' MB';
+}
 function showUsage(){
-  if (!navigator.storage || !navigator.storage.estimate) return;
-  navigator.storage.estimate().then(function(e){
-    var el = $('#usage'); if (!el || !e.usage) return;
-    el.textContent = 'Usando ' + Math.round(e.usage/1048576) + ' MB neste aparelho.';
-  }).catch(function(){});
+  var el = $('#usage'); if (!el) return;
+  var counting = state.songs.some(function(s){ return s.size == null; });
+  var used = usedBytes(), pct = Math.min(100, used / STORAGE_LIMIT * 100), full = pct >= 90;
+  el.className = 'storage' + (full ? ' warn' : '');
+  el.innerHTML = '<div class="st-row"><span class="st-k">Espaço do Ensaio</span><span class="st-v">' + (counting ? 'Calculando…' : fmtSize(used) + ' de ' + fmtSize(STORAGE_LIMIT)) + '</span></div>' +
+    '<div class="st-bar" role="progressbar" aria-label="Espaço usado" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + Math.round(pct) + '"><span style="width:' + pct.toFixed(1) + '%"></span></div>' +
+    (counting ? '' : '<p class="st-free">' + (freeBytes() < 1048576 ? 'Cheio. Exclua músicas que saíram do repertório para adicionar outras.' :
+      'Faltam ' + fmtSize(freeBytes()) + (full ? '. Está quase cheio: exclua músicas que saíram do repertório.' : ' para novas músicas.')) + '</p>');
+}
+async function backfillSizes(){
+  /* Músicas guardadas antes do limite não sabem o próprio tamanho: mede uma de cada vez */
+  var todo = state.songs.filter(function(s){ return s.size == null; });
+  for (var i = 0; i < todo.length; i++) {
+    var s = todo[i], a = await loadAudio(s.id);
+    s.size = a && a.buf ? a.buf.byteLength : 0;
+    a = null;
+    try { await save('songs', s); } catch(e){}
+  }
+  if (todo.length && state.view === 'library') showUsage();
 }
 function renderMini(){
   var s = curSong(), el = $('#mini');
@@ -824,14 +847,15 @@ $('#dataFile').addEventListener('change', async function(e){
 
 /* ---------- Ações ---------- */
 async function addFiles(files){
-  var added = 0, restored = 0;
+  var added = 0, restored = 0, skipped = [];
   for (var i = 0; i < files.length; i++) {
     var f = files[i], id = uid();
+    if (usedBytes() + f.size > STORAGE_LIMIT) { skipped.push(f.name); continue; }
     toast('Guardando ' + (i+1) + ' de ' + files.length + '…');
     try {
       var buf = await f.arrayBuffer();
       var title = f.name.replace(/\.[^.]+$/, '').replace(/_+/g, ' ').trim() || 'Sem título';
-      var song = { id:id, title:title, lyrics:[], duration:null, added:Date.now() };
+      var song = { id:id, title:title, lyrics:[], duration:null, added:Date.now(), size:buf.byteLength };
       if (db) await save('audio', { id:id, buf:buf, type:f.type || 'audio/mpeg' });
       else mem.audio.set(id, { id:id, buf:buf, type:f.type || 'audio/mpeg' });
       await save('songs', song);
@@ -843,9 +867,17 @@ async function addFiles(files){
       await new Promise(function(r){ setTimeout(r, 1500); });
     }
   }
-  if (added) toast((added === 1 ? 'Música adicionada' : added + ' músicas adicionadas') +
+  var msg = [];
+  if (added) msg.push((added === 1 ? 'Música adicionada' : added + ' músicas adicionadas') +
     (restored ? (restored === 1 ? '. 1 recebeu a letra importada' : '. ' + restored + ' receberam a letra importada') : ''));
+  if (skipped.length) msg.push((skipped.length === 1 ? '“' + skipped[0] + '” não coube' : skipped.length + ' músicas não couberam') +
+    ' no limite de ' + fmtSize(STORAGE_LIMIT) + ' (faltam ' + fmtSize(freeBytes()) + '). Exclua músicas que saíram do repertório');
+  if (msg.length) toast(msg.join('. '), skipped.length ? 6000 : 0);
   render();
+}
+async function addRequest(){
+  if (freeBytes() < 1048576) { toast('O espaço de ' + fmtSize(STORAGE_LIMIT) + ' do Ensaio está cheio. Exclua músicas que saíram do repertório para adicionar outras.', 6000); return; }
+  $('#file').click();
 }
 $('#file').addEventListener('change', function(e){ var fs = Array.from(e.target.files || []); e.target.value = ''; if (fs.length) addFiles(fs); });
 
@@ -900,7 +932,7 @@ document.addEventListener('click', async function(e){
   var act = b.dataset.act, id = b.dataset.id, i = +b.dataset.i, p = plById(state.openPl);
   switch (act) {
     case 'tab': state.view = b.dataset.v; render(); $('#main').scrollTop = 0; break;
-    case 'add': $('#file').click(); break;
+    case 'add': addRequest(); break;
     case 'export': exportData(); break;
     case 'import': $('#dataFile').value = ''; $('#dataFile').click(); break;
     case 'droppending':
@@ -1050,6 +1082,7 @@ audio.addEventListener('error', function(){ if (audio.src) toast('Este formato d
   state.playlists = await loadAll('playlists');
   state.pending = await loadAll('pending');
   render();
+  backfillSizes().catch(function(){});
   requestAnimationFrame(tick);
   try { if (window.claude && typeof window.claude.use === 'function') downloadsNs = await window.claude.use('downloads'); } catch(e){ downloadsNs = null; }
 })();
