@@ -29,6 +29,7 @@ Velocidade de 0,5× a 1,25× sem mudar o tom
 Repetição de trecho (A–B)
 Botões de −5 s e +5 s
 Três tamanhos de letra, para ler de longe na estante
+Tema claro, escuro ou automático (segue o celular), escolhido no ícone do cabeçalho
 Tela acesa enquanto a música toca
 
 Anotações

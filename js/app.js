@@ -116,18 +116,45 @@ function activeIdx(lines, t){ var a = -1; for (var i = 0; i < lines.length; i++)
 /* ---------- Telas ---------- */
 function render(){ renderHeader(); renderTabs(); renderView(); renderMini(); }
 function renderHeader(){
-  var h = $('#hdr');
+  var h = $('#hdr'), tb = themeBtn();
   if (state.view === 'playlist') {
     var p = plById(state.openPl);
-    h.innerHTML = '<button class="back" data-act="back">‹ Playlists</button><h1 class="h-pl">' + esc(p ? p.name : '') + '</h1>';
+    h.innerHTML = '<button class="back" data-act="back">‹ Playlists</button>' + tb + '<h1 class="h-pl">' + esc(p ? p.name : '') + '</h1>';
   } else if (state.view === 'library') {
-    h.innerHTML = '<h1>Ensaio</h1>' + (state.songs.length ? '<button class="btn" data-act="add">Adicionar músicas</button>' : '');
+    h.innerHTML = '<h1>Ensaio</h1><div class="hdr-actions">' + tb + (state.songs.length ? '<button class="btn" data-act="add">Adicionar músicas</button>' : '') + '</div>';
   } else if (state.view === 'help') {
-    h.innerHTML = '<h1>Ajuda</h1>';
+    h.innerHTML = '<h1>Ajuda</h1><div class="hdr-actions">' + tb + '</div>';
   } else {
-    h.innerHTML = '<h1>Playlists</h1><button class="btn" data-act="newpl">Nova playlist</button>';
+    h.innerHTML = '<h1>Playlists</h1><div class="hdr-actions">' + tb + '<button class="btn" data-act="newpl">Nova playlist</button></div>';
   }
 }
+
+/* ---------- Tema ---------- */
+var THEMES = { auto:'Automático (igual ao celular)', light:'Claro', dark:'Escuro' };
+function getTheme(){ try { var t = localStorage.getItem('ensaio-theme'); return THEMES[t] ? t : 'auto'; } catch(e){ return 'auto'; } }
+function themeBtn(){
+  return '<button class="icon-btn theme-btn" data-act="theme" aria-label="Tema: ' + esc(THEMES[getTheme()]) + '. Toque para mudar">' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor"/></svg></button>';
+}
+function applyTheme(t){
+  var root = document.documentElement;
+  if (t === 'light' || t === 'dark') root.setAttribute('data-theme', t); else root.removeAttribute('data-theme');
+  /* Cor da barra do navegador acompanha o fundo do app */
+  var meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', getComputedStyle(root).getPropertyValue('--bg').trim() || '#E9EDF4');
+}
+function themeMenu(){
+  var cur = getTheme();
+  actionSheet('Tema', Object.keys(THEMES).map(function(k){
+    return { label: THEMES[k] + (k === cur ? '  ✓' : ''), fn:function(){
+      try { if (k === 'auto') localStorage.removeItem('ensaio-theme'); else localStorage.setItem('ensaio-theme', k); } catch(e){}
+      applyTheme(k); renderHeader();
+      toast('Tema: ' + THEMES[k].replace(' (igual ao celular)', ''));
+    } };
+  }));
+}
+applyTheme(getTheme());
+try { matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function(){ if (getTheme() === 'auto') applyTheme('auto'); }); } catch(e){}
 function renderTabs(){
   var v = state.view === 'playlist' ? 'playlists' : state.view;
   document.querySelectorAll('.tab').forEach(function(t){ if (t.dataset.v === v) t.setAttribute('aria-current','page'); else t.removeAttribute('aria-current'); });
@@ -1014,6 +1041,7 @@ document.addEventListener('click', async function(e){
     case 'tab': state.view = b.dataset.v; render(); $('#main').scrollTop = 0; break;
     case 'add': addRequest(); break;
     case 'export': exportData(); break;
+    case 'theme': themeMenu(); break;
     case 'import': $('#dataFile').value = ''; $('#dataFile').click(); break;
     case 'droppending':
       if (!(await confirmBox('Descartar as letras de ' + state.pending.length + (state.pending.length === 1 ? ' música que ainda não tem' : ' músicas que ainda não têm') + ' áudio aqui?', 'Descartar'))) break;
