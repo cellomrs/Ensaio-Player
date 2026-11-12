@@ -369,6 +369,9 @@ function renderTools(){
     if (p[1] == null || !d) { el.hidden = true; return; }
     el.hidden = false; el.style.left = (p[1]/d*100) + '%';
   });
+  var rb = $('#bRepeat'), r = REPEAT[repeatMode];
+  rb.innerHTML = r.icon; rb.setAttribute('aria-label', 'Ao terminar: ' + r.label + '. Toque para mudar');
+  rb.setAttribute('aria-pressed', repeatMode !== 'next' ? 'true' : 'false');
   var syncing = !!state.sync, adj = state.adjust;
   $('#tools').hidden = syncing || !!adj; $('#syncBar').hidden = !syncing; $('#adjBar').hidden = !adj;
   if (adj) renderAdjust();
@@ -399,9 +402,42 @@ function applyRate(){
   audio.defaultPlaybackRate = state.rate; audio.playbackRate = state.rate;
   audio.preservesPitch = true; audio.mozPreservesPitch = true; audio.webkitPreservesPitch = true;
 }
+/* Ao terminar a música: pausar, seguir a fila, repetir a música ou repetir a fila */
+var REPEAT_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+var REPEAT = {
+  stop: { label:'Pausar ao fim da música', short:'Pausa ao fim da música',
+    icon: REPEAT_SVG + '<path d="M5 6l8 6-8 6z" fill="currentColor"/><path d="M18 6v12"/></svg>' },
+  next: { label:'Seguir a fila até o fim', short:'Segue a fila até o fim',
+    icon: REPEAT_SVG + '<path d="M3 6h12M3 12h12M3 18h7"/><path d="M15 15l6 3-6 3z" fill="currentColor"/></svg>' },
+  one: { label:'Repetir esta música', short:'Repetindo esta música',
+    icon: REPEAT_SVG + '<path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/><path d="M11 10.5l1.5-1v5.5" stroke-width="2"/></svg>' },
+  all: { label:'Repetir a fila toda', short:'Repetindo a fila toda',
+    icon: REPEAT_SVG + '<path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/></svg>' }
+};
+var repeatMode = 'next';
+try { var savedRep = localStorage.getItem('ensaio-repeat'); if (REPEAT[savedRep]) repeatMode = savedRep; } catch(e){}
+function setRepeat(m){
+  repeatMode = m; try { localStorage.setItem('ensaio-repeat', m); } catch(e){}
+  renderTools(); toast(REPEAT[m].short);
+}
+function repeatMenu(){
+  actionSheet('Ao terminar a música', ['stop','next','one','all'].map(function(m){
+    return { label: REPEAT[m].label + (m === repeatMode ? '  ✓' : ''), fn:function(){ setRepeat(m); } };
+  }));
+}
+function restartSong(){
+  audio.currentTime = 0; lastActive = -2; userScrollAt = 0;
+  if (playerOpen) $('#lyrics').scrollTop = 0;
+}
 function toggle(){ if (!audio.src) return; if (audio.paused) audio.play().catch(function(){}); else audio.pause(); }
-function prev(){ if (audio.currentTime > 3 || state.qi <= 0) { audio.currentTime = state.loopA != null ? state.loopA : 0; } else playAt(state.qi - 1); }
-function next(){ if (state.qi < state.queue.length - 1) playAt(state.qi + 1); }
+function prev(){
+  if (audio.currentTime <= 3 && state.qi <= 0 && repeatMode === 'all' && state.queue.length > 1) { playAt(state.queue.length - 1); return; }
+  if (audio.currentTime > 3 || state.qi <= 0) { audio.currentTime = state.loopA != null ? state.loopA : 0; } else playAt(state.qi - 1);
+}
+function next(){
+  if (state.qi < state.queue.length - 1) playAt(state.qi + 1);
+  else if (repeatMode === 'all' && state.queue.length) playAt(0);
+}
 function openPlayer(){
   if (!curSong()) return;
   playerOpen = true;
@@ -1109,6 +1145,7 @@ $('#bRate').onclick = function(){
     return { label: rateLabel(r) + (r === 1 ? ' (normal)' : '') + (r === state.rate ? '  ✓' : ''), fn:function(){ state.rate = r; applyRate(); renderTools(); } };
   }));
 };
+$('#bRepeat').onclick = repeatMenu;
 $('#bLoop').onclick = function(){
   if (!audio.src) return;
   if (state.loopA == null) { state.loopA = audio.currentTime; toast('Início marcado em ' + fmt(state.loopA) + '. Toque de novo no fim do trecho'); }
@@ -1183,8 +1220,11 @@ audio.addEventListener('loadedmetadata', function(){
 audio.addEventListener('ended', function(){
   if (state.sync) finishSync();
   if (state.adjust) { setPlayIcons(); return; }
+  if (repeatMode === 'one') { restartSong(); audio.play().catch(function(){}); return; }
+  if (repeatMode === 'stop') { restartSong(); setPlayIcons(); return; }
   if (state.qi < state.queue.length - 1) playAt(state.qi + 1);
-  else { audio.currentTime = 0; setPlayIcons(); }
+  else if (repeatMode === 'all') playAt(0);
+  else { restartSong(); setPlayIcons(); }
 });
 audio.addEventListener('error', function(){ if (audio.src) toast('Este formato de áudio não toca neste aparelho'); });
 

@@ -126,7 +126,9 @@ textarea.field.notes-ta{min-height:9rem}
 .transport .skip{width:52px;height:44px;background:none;border:0;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
 .play{width:70px;height:70px;border-radius:50%;border:0;background:var(--btn);color:var(--btn-ink);display:grid;place-items:center}
 .play svg{width:32px;height:32px}
-.tools{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.tools{display:grid;grid-template-columns:1fr 1fr 1fr 2fr 1fr;gap:8px}
+.tool-ico{display:grid;place-items:center}
+.tool-ico svg{width:22px;height:22px}
 .tool{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 4px;font-weight:700;font-size:.92rem;min-height:46px}
 .tool[aria-pressed="true"]{background:var(--btn);color:var(--btn-ink);border-color:transparent}
 .syncbar{display:grid;grid-template-columns:1fr 1.8fr 1fr;gap:8px}
