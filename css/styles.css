@@ -146,6 +146,20 @@ textarea.field.notes-ta{min-height:9rem}
 .imp-sum{margin:0 0 12px;padding-left:20px;color:var(--text);line-height:1.5;font-size:.95rem}
 .imp-sum li{margin-bottom:6px}
 
+/* Busca e páginas */
+.lib-tools{position:sticky;top:-4px;z-index:2;background:var(--bg);display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:4px 6px 10px}
+.field.search{flex:1 1 220px;padding:10px 14px;border-radius:999px}
+.per{color:var(--muted);font-size:.85rem;white-space:nowrap}
+.per select{font:inherit;font-weight:700;color:var(--text);background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:6px 4px;margin:0 2px}
+.lib-count{color:var(--muted);font-size:.85rem;padding:2px 8px 6px;margin:0}
+.pager{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 6px 4px}
+.pager .btn{padding:8px 14px}
+.pager .btn:disabled{opacity:.35}
+.pg-info{color:var(--muted);font-size:.85rem;font-variant-numeric:tabular-nums;text-align:center}
+.pick-tools{margin-bottom:8px}
+.pick-count{font-size:.82rem!important;margin:0 0 4px!important}
+.pick-n{margin-left:auto;flex:none;min-width:1.6em;text-align:center;font-size:.8rem;font-weight:700;background:var(--btn);color:var(--btn-ink);border-radius:999px;padding:1px 6px}
+
 /* Espaço do app (limite de 1 GB) */
 .storage{margin:18px 6px 24px;padding:12px 14px;background:var(--surface);border:1px solid var(--line);border-radius:14px}
 .st-row{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px;font-size:.88rem}

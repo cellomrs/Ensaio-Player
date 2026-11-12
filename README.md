@@ -9,6 +9,8 @@ Funcionalidades
 Músicas e playlists
 
 Adicione arquivos de áudio direto do celular (MP3, M4A e outros formatos que o navegador toque)
+Busca por nome ou por trecho da letra, sem diferença de maiúsculas e acentos; tocar a partir da busca usa só os resultados como fila
+Lista em páginas de 10, 20 ou 50 músicas (o app nunca desenha a lista inteira de uma vez)
 Monte playlists com o repertório na ordem do ensaio
 Ao terminar uma música, a próxima começa sozinha
 Controles na tela de bloqueio e nos fones, quando o celular permite

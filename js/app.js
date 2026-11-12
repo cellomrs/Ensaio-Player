@@ -132,11 +132,11 @@ function renderTabs(){
   var v = state.view === 'playlist' ? 'playlists' : state.view;
   document.querySelectorAll('.tab').forEach(function(t){ if (t.dataset.v === v) t.setAttribute('aria-current','page'); else t.removeAttribute('aria-current'); });
 }
-function songRow(s, extra){
+function songRow(s, extra, sub){
   var cur = curSong();
   return '<div class="row' + (cur && cur.id === s.id ? ' playing' : '') + '">' + (extra && extra.pre || '') +
     '<button class="row-main" data-act="' + (extra ? extra.act : 'play') + '" data-id="' + s.id + '"' + (extra ? ' data-i="' + extra.i + '"' : '') + '>' +
-    '<span class="t">' + esc(s.title) + '</span><span class="s">' + esc(songSub(s)) + '</span></button>' +
+    '<span class="t">' + esc(s.title) + '</span><span class="s">' + esc(sub || songSub(s)) + '</span></button>' +
     (extra ? extra.post : '<button class="icon-btn small" data-act="more" data-id="' + s.id + '" aria-label="Opções de ' + esc(s.title) + '">' + ICON.more + '</button>') +
     '</div>';
 }
@@ -152,7 +152,9 @@ function renderView(){
         (state.pending.length ? '' : '<p class="empty-alt">Já tem um arquivo de dados exportado do Ensaio? <button class="link-btn" data-act="import">Importar dados</button></p>') + '</div>' + pendingBlock();
       return;
     }
-    m.innerHTML = sortedSongs().map(function(s){ return songRow(s); }).join('') + pendingBlock() +
+    if (!m.querySelector('#libList')) libraryShell(m);
+    renderLibList();
+    $('#libRest').innerHTML = pendingBlock() +
       '<div class="data-actions"><button class="btn sec" data-act="export">Exportar dados</button><button class="btn sec" data-act="import">Importar dados</button></div>' +
       '<div id="usage"></div>';
     showUsage();
@@ -182,6 +184,58 @@ function renderView(){
     m.innerHTML = html;
   }
 }
+/* ---------- Lista de músicas: busca e páginas (nunca mostra todas de uma vez) ---------- */
+var PER_OPTS = [10, 20, 50];
+var lib = { q:'', page:0, per:20 };
+try { var savedPer = +localStorage.getItem('ensaio-per'); if (PER_OPTS.indexOf(savedPer) >= 0) lib.per = savedPer; } catch(e){}
+function perSelect(id){
+  return '<label class="per">Mostrar <select id="' + id + '">' + PER_OPTS.map(function(n){ return '<option value="' + n + '"' + (n === lib.per ? ' selected' : '') + '>' + n + '</option>'; }).join('') + '</select> por página</label>';
+}
+function setPer(n){ lib.per = n; try { localStorage.setItem('ensaio-per', String(n)); } catch(e){} }
+/* Busca no nome e, se não achar no nome, num verso da letra. Sem diferença de maiúsculas e acentos. */
+function searchSongs(query, inLyrics){
+  var q = normTitle(query), all = sortedSongs();
+  if (!q) return all.map(function(s){ return { s:s }; });
+  var byTitle = [], byLyric = [];
+  all.forEach(function(s){
+    if (normTitle(s.title).indexOf(q) >= 0) { byTitle.push({ s:s }); return; }
+    if (!inLyrics) return;
+    var l = s.lyrics.find(function(x){ return x.text && normTitle(x.text).indexOf(q) >= 0; });
+    if (l) byLyric.push({ s:s, line:l.text });
+  });
+  return byTitle.concat(byLyric);
+}
+function pageOf(list, page, per){
+  var pages = Math.max(1, Math.ceil(list.length / per));
+  page = Math.min(Math.max(0, page), pages - 1);
+  return { page:page, pages:pages, from:page * per, items:list.slice(page * per, page * per + per) };
+}
+function pagerHtml(pg, total, attr){
+  if (total <= lib.per) return '';
+  return '<div class="pager"><button class="btn sec" ' + attr + '="prev"' + (pg.page === 0 ? ' disabled' : '') + '>‹ Anterior</button>' +
+    '<span class="pg-info">' + (pg.from + 1) + '–' + (pg.from + pg.items.length) + ' de ' + total + '</span>' +
+    '<button class="btn sec" ' + attr + '="next"' + (pg.page >= pg.pages - 1 ? ' disabled' : '') + '>Próxima ›</button></div>';
+}
+function libraryShell(m){
+  m.innerHTML = '<div class="lib-tools"><input type="search" id="libSearch" class="field search" placeholder="Buscar por nome ou trecho da letra" aria-label="Buscar músicas" autocomplete="off" enterkeyhint="search">' +
+    perSelect('libPer') + '</div><div id="libList" aria-live="polite"></div><div id="libRest"></div>';
+  var inp = $('#libSearch'), t;
+  inp.value = lib.q;
+  inp.addEventListener('input', function(){ clearTimeout(t); t = setTimeout(function(){ lib.q = inp.value; lib.page = 0; renderLibList(); }, 150); });
+  inp.addEventListener('keydown', function(e){ if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape' && inp.value) { e.stopPropagation(); inp.value = ''; lib.q = ''; lib.page = 0; renderLibList(); } });
+  $('#libPer').addEventListener('change', function(e){ setPer(+e.target.value); lib.page = 0; renderLibList(); });
+}
+function libResults(){ return searchSongs(lib.q, true); }
+function renderLibList(){
+  var box = $('#libList'); if (!box) return;
+  var res = libResults(), pg = pageOf(res, lib.page, lib.per);
+  lib.page = pg.page;
+  var head = '';
+  if (lib.q.trim()) head = '<p class="lib-count">' + (res.length ? res.length + (res.length === 1 ? ' música encontrada' : ' músicas encontradas') : 'Nada encontrado para “' + esc(lib.q.trim()) + '”') +
+    ' <button class="link-btn" data-act="clearsearch">Limpar busca</button></p>';
+  box.innerHTML = head + pg.items.map(function(r){ return songRow(r.s, null, r.line ? 'na letra: “' + r.line + '”' : null); }).join('') + pagerHtml(pg, res.length, 'data-pg');
+}
+
 /* Limite de espaço do próprio app: soma dos áudios guardados */
 var STORAGE_LIMIT = 1024 * 1048576; /* 1 GB */
 function usedBytes(){ return state.songs.reduce(function(n, s){ return n + (s.size || 0); }, 0); }
@@ -518,7 +572,7 @@ function modal(html, onCancel){
   $('#sheet').innerHTML = html; $('#modal').hidden = false; cancelFn = onCancel || null;
   var f = $('#sheet').querySelector('[autofocus]'); if (f) setTimeout(function(){ f.focus(); }, 50);
 }
-function closeModal(){ $('#modal').hidden = true; $('#sheet').innerHTML = ''; $('#sheet').onclick = null; cancelFn = null; }
+function closeModal(){ $('#modal').hidden = true; $('#sheet').innerHTML = ''; $('#sheet').onclick = null; $('#sheet').onchange = null; cancelFn = null; }
 function cancelModal(){ var f = cancelFn; closeModal(); if (f) f(); }
 $('#modal').addEventListener('click', function(e){ if (e.target === $('#modal') && Date.now() - modalOpenedAt > 450) cancelModal(); });
 $('#sheet').addEventListener('click', function(e){ if (Date.now() - modalOpenedAt < 450) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
@@ -553,15 +607,35 @@ function confirmBox(text, okLabel){
 function pickSongs(selected){
   return new Promise(function(res){
     if (!state.songs.length) { toast('Adicione músicas na aba Músicas primeiro'); return res(null); }
-    modal('<h2>Escolher músicas</h2><div>' + sortedSongs().map(function(s){
-      return '<label class="pick"><input type="checkbox" value="' + s.id + '"' + (selected.indexOf(s.id) >= 0 ? ' checked' : '') + '><span>' + esc(s.title) + '</span></label>';
-    }).join('') + '</div><div class="m-actions"><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>', function(){ res(null); });
-    var picked = selected.filter(function(id){ return true; });
-    $('#sheet').addEventListener('change', function(e){
-      var v = e.target.value; if (!v) return;
+    modal('<h2>Escolher músicas</h2>' +
+      '<div class="pick-tools"><input type="search" id="pickSearch" class="field search" placeholder="Buscar pelo nome" aria-label="Buscar músicas" autocomplete="off" enterkeyhint="search"></div>' +
+      '<p class="pick-count" id="pickCount"></p><div id="pickList"></div>' +
+      '<div class="m-actions"><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>', function(){ res(null); });
+    var picked = selected.filter(function(id){ return !!songById(id); }), pq = '', pp = 0, pt;
+    function renderPick(){
+      var list = searchSongs(pq, false), pg = pageOf(list, pp, lib.per);
+      pp = pg.page;
+      $('#pickCount').textContent = picked.length + (picked.length === 1 ? ' selecionada' : ' selecionadas') + ' · entram na ordem em que você marca' +
+        (pq.trim() && !list.length ? ' · nada encontrado' : '');
+      $('#pickList').innerHTML = pg.items.map(function(r){
+        var s = r.s, n = picked.indexOf(s.id);
+        return '<label class="pick"><input type="checkbox" value="' + s.id + '"' + (n >= 0 ? ' checked' : '') + '><span>' + esc(s.title) + '</span>' + (n >= 0 ? '<span class="pick-n">' + (n + 1) + '</span>' : '') + '</label>';
+      }).join('') + pagerHtml(pg, list.length, 'data-ppg');
+    }
+    renderPick();
+    var ps = $('#pickSearch');
+    ps.addEventListener('input', function(){ clearTimeout(pt); pt = setTimeout(function(){ pq = ps.value; pp = 0; renderPick(); }, 150); });
+    ps.addEventListener('keydown', function(e){ if (e.key === 'Enter') { e.preventDefault(); ps.blur(); } });
+    $('#sheet').onchange = function(e){
+      var v = e.target.value; if (!v || e.target.type !== 'checkbox') return;
       if (e.target.checked) { if (picked.indexOf(v) < 0) picked.push(v); } else picked = picked.filter(function(x){ return x !== v; });
-    });
-    $('#sheet').onclick = function(e){ var b = e.target.closest('[data-m]'); if (!b) return; closeModal(); res(b.dataset.m === 'ok' ? picked : null); };
+      renderPick();
+    };
+    $('#sheet').onclick = function(e){
+      var g = e.target.closest('[data-ppg]');
+      if (g) { if (!g.disabled) { pp += g.dataset.ppg === 'next' ? 1 : -1; renderPick(); $('#sheet').scrollTop = 0; } return; }
+      var b = e.target.closest('[data-m]'); if (!b) return; closeModal(); res(b.dataset.m === 'ok' ? picked : null);
+    };
   });
 }
 function notesEditor(s){
@@ -927,6 +1001,12 @@ async function deleteSong(id){
   toast('Música excluída'); render();
 }
 
+document.addEventListener('click', function(e){
+  var b = e.target.closest('#libList [data-pg]'); if (!b || b.disabled) return;
+  lib.page += b.dataset.pg === 'next' ? 1 : -1;
+  renderLibList();
+  var tools = $('.lib-tools'); $('#main').scrollTop = tools ? tools.offsetTop - 8 : 0;
+});
 document.addEventListener('click', async function(e){
   var b = e.target.closest('[data-act]'); if (!b) return;
   var act = b.dataset.act, id = b.dataset.id, i = +b.dataset.i, p = plById(state.openPl);
@@ -941,7 +1021,12 @@ document.addEventListener('click', async function(e){
       state.pending = [];
       for (var dq = 0; dq < state.playlists.length; dq++) { var dpl = state.playlists[dq]; if (dpl.pendingTitles) { delete dpl.pendingTitles; await save('playlists', dpl); } }
       toast('Letras descartadas'); render(); break;
-    case 'play': var list = sortedSongs().map(function(s){ return s.id; }); playQueue(list, list.indexOf(id), 'Todas as músicas'); break;
+    case 'play':
+      /* Com busca ativa, a fila são os resultados da busca (todos, não só a página) */
+      var searching = !!lib.q.trim();
+      var list = libResults().map(function(r){ return r.s.id; });
+      playQueue(list, list.indexOf(id), searching ? 'Busca “' + lib.q.trim() + '”' : 'Todas as músicas'); break;
+    case 'clearsearch': lib.q = ''; lib.page = 0; if ($('#libSearch')) $('#libSearch').value = ''; renderLibList(); break;
     case 'more': songMenu(id); break;
     case 'newpl': var np = await newPlaylist([]); if (np) { state.openPl = np.id; state.view = 'playlist'; render(); } break;
     case 'openpl': state.openPl = id; state.view = 'playlist'; render(); $('#main').scrollTop = 0; break;
