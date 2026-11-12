@@ -58,6 +58,26 @@
         <button class="tool" id="sDone">Concluir</button>
         <button class="tool" id="sCancel">Cancelar</button>
       </div>
+      <div class="adjbar" id="adjBar" hidden>
+        <div class="adj-scope" role="group" aria-label="O que ajustar">
+          <button class="tool" data-scope="line" aria-pressed="true">Este verso</button>
+          <button class="tool" data-scope="after" aria-pressed="false">Daqui em diante</button>
+          <button class="tool" data-scope="all" aria-pressed="false">Letra toda</button>
+        </div>
+        <div class="adj-steps">
+          <button class="tool step" data-adj="-10" aria-label="Adiantar 10 segundos">−10s</button>
+          <button class="tool step" data-adj="-5" aria-label="Adiantar 5 segundos">−5s</button>
+          <button class="tool step" data-adj="-1" aria-label="Adiantar 1 segundo">−1s</button>
+          <button class="tool step" data-adj="1" aria-label="Atrasar 1 segundo">+1s</button>
+          <button class="tool step" data-adj="5" aria-label="Atrasar 5 segundos">+5s</button>
+          <button class="tool step" data-adj="10" aria-label="Atrasar 10 segundos">+10s</button>
+        </div>
+        <div class="adj-foot">
+          <span class="adj-time"><span class="adj-k">Verso em</span><span id="aTime" aria-live="polite">—</span></span>
+          <button class="tool" id="aCancel">Cancelar</button>
+          <button class="mark" id="aDone">Concluir</button>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -122,6 +142,16 @@
 <li>Ao marcar a última linha, tudo é salvo. Para parar antes e manter os tempos marcados, toque em <b>Concluir</b>. Para descartar as alterações desta tentativa, toque em <b>Cancelar</b>.</li>
 </ol>
 <p>O Ensaio desconta um pequeno atraso do toque, então não precisa adiantar.</p>
+<h3>Ajustar tempos</h3>
+<p>Para corrigir um verso que acende cedo ou tarde, sem sincronizar tudo de novo:</p>
+<ol>
+<li>Toque em <b>Sincronizar</b> e escolha <b>Ajustar tempos</b>. Também tem esse item em <b>Letra</b>.</li>
+<li>Toque no verso que quer corrigir. Ele fica marcado com o traço amarelo.</li>
+<li>Escolha o que mexer: <b>Este verso</b>, <b>Daqui em diante</b> (este e todos os seguintes) ou <b>Letra toda</b>.</li>
+<li>Use <b>−10s −5s −1s</b> para o verso acender antes, ou <b>+1s +5s +10s</b> para acender depois. A cada toque a música volta 2 segundos antes do verso, para você conferir.</li>
+<li>Toque em <b>Concluir</b> para salvar, ou <b>Cancelar</b> para voltar como estava.</li>
+</ol>
+<p>Em <b>Este verso</b>, o tempo não passa do verso anterior nem do seguinte, para a ordem não embaralhar.</p>
 <h3>Importar .lrc</h3>
 <p>No editor de letra, toque em <b>Importar .lrc</b> ou cole o conteúdo do arquivo. A letra já fica sincronizada. Dá para ajustar tempos à mão: cada linha começa com o tempo entre colchetes, como <code>[01:23.40]</code>.</p>
 </div></details>
@@ -130,7 +160,7 @@
 <ul>
 <li><b>Velocidade (1×):</b> de 0,5× a 1,25× sem mudar o tom. Fica amarelo quando não está na velocidade normal.</li>
 <li><b>A–B:</b> toque no começo do trecho e em <b>Marcar B</b> no fim; o trecho repete até você tocar de novo para desligar. Os pontos aparecem na barra de posição.</li>
-<li><b>Sincronizar:</b> marca os tempos da letra.</li>
+<li><b>Sincronizar:</b> marca os tempos da letra. Se ela já tem tempos, também dá para ajustá-los com ±1s, ±5s e ±10s.</li>
 <li><b>Aa:</b> alterna o tamanho da letra entre pequena, média e grande.</li>
 </ul>
 <p>A velocidade vale para todas as músicas até você mudar. O trecho A–B desliga ao trocar de música.</p>
@@ -179,7 +209,7 @@
 <h3>A letra não rola sozinha</h3>
 <p>Ela ainda não tem tempos: use Sincronizar. Se já tem, espere alguns segundos depois de rolar com o dedo.</p>
 <h3>O destaque chega antes ou depois do verso</h3>
-<p>Sincronize de novo a partir dele, ou ajuste o tempo no editor de letra.</p>
+<p>Use <b>Sincronizar → Ajustar tempos</b> e empurre o verso com os botões ±1s, ±5s ou ±10s. Se a letra toda está adiantada ou atrasada igual, escolha <b>Letra toda</b>.</p>
 <h3>A tela apaga durante o ensaio</h3>
 <p>Mantenha o player aberto com a música tocando. Se ainda apagar, aumente o tempo de bloqueio nas configurações do celular.</p>
 <h3>O toque longo não abre a anotação</h3>

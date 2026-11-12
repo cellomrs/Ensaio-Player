@@ -9,7 +9,7 @@ var ICON = {
   down:'<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
 };
-var state = { songs:[], playlists:[], queue:[], qi:-1, queueName:'', view:'library', openPl:null, sync:null, loopA:null, loopB:null, rate:1 };
+var state = { songs:[], playlists:[], queue:[], qi:-1, queueName:'', view:'library', openPl:null, sync:null, adjust:null, loopA:null, loopB:null, rate:1 };
 var db = null;
 var mem = { songs:new Map(), audio:new Map(), playlists:new Map() };
 var audio = new Audio();
@@ -217,7 +217,7 @@ function renderNotes(){
 }
 function renderLyrics(){
   var box = $('#lyrics'), s = curSong(); lastActive = -2;
-  box.classList.toggle('syncing', !!state.sync);
+  box.classList.toggle('syncing', !!state.sync || !!state.adjust);
   if (!s) { box.innerHTML = '<div class="l-empty"><p>Escolha uma música para começar.</p></div>'; return; }
   if (!s.lyrics.length) { box.innerHTML = '<div class="l-empty"><p>Esta música ainda não tem letra.</p><button class="btn" data-act="editlyrics">Adicionar letra</button></div>'; return; }
   var synced = s.lyrics.some(function(l){ return l.t != null; });
@@ -226,7 +226,7 @@ function renderLyrics(){
     s.lyrics.map(function(l, i){
       return l.text ? '<div class="line' + (l.t != null ? ' timed' : '') + '" data-act="line" data-i="' + i + '">' + esc(l.text) + (l.note ? '<span class="lnote">' + esc(l.note) + '</span>' : '') + '</div>' : '<div class="gap"></div>';
     }).join('') + '<p class="lhint">Segure uma linha para escrever uma anotação nela.</p><div class="spacer"></div>';
-  if (state.sync) markTarget();
+  if (state.sync || state.adjust) markTarget();
   updateActive();
 }
 function centerLine(i, force){
@@ -245,7 +245,7 @@ function updateActive(){
     el.classList.toggle('on', i === a);
     el.classList.toggle('past', a >= 0 && i < a);
   });
-  if (a >= 0 && !state.sync && playerOpen) centerLine(a);
+  if (a >= 0 && !state.sync && !state.adjust && playerOpen) centerLine(a);
 }
 function renderTools(){
   $('#bRate').textContent = rateLabel(state.rate);
@@ -260,12 +260,14 @@ function renderTools(){
     if (p[1] == null || !d) { el.hidden = true; return; }
     el.hidden = false; el.style.left = (p[1]/d*100) + '%';
   });
-  var syncing = !!state.sync;
-  $('#tools').hidden = syncing; $('#syncBar').hidden = !syncing;
+  var syncing = !!state.sync, adj = state.adjust;
+  $('#tools').hidden = syncing || !!adj; $('#syncBar').hidden = !syncing; $('#adjBar').hidden = !adj;
+  if (adj) renderAdjust();
 }
 async function playAt(i){
   if (i < 0 || i >= state.queue.length) return;
   if (state.sync) finishSync(true);
+  if (state.adjust) finishAdjust(true);
   state.qi = i;
   var s = curSong();
   var a = await loadAudio(s.id);
@@ -341,6 +343,7 @@ if ('mediaSession' in navigator) {
 /* ---------- Sincronização ---------- */
 function startSync(){
   var s = curSong(); if (!s) return;
+  if (state.adjust) finishAdjust(true);
   if (!s.lyrics.some(function(l){ return l.text; })) { toast('Adicione a letra antes de sincronizar'); lyricsEditor(s); return; }
   state.sync = {
     idx: nextLine(s, 0),
@@ -355,8 +358,9 @@ function startSync(){
 function markTarget(){
   var box = $('#lyrics');
   box.querySelectorAll('.line.target').forEach(function(el){ el.classList.remove('target'); });
-  if (!state.sync || state.sync.idx < 0) return;
-  var el = box.querySelector('.line[data-i="' + state.sync.idx + '"]');
+  var idx = state.sync ? state.sync.idx : state.adjust ? state.adjust.idx : -1;
+  if (idx < 0) return;
+  var el = box.querySelector('.line[data-i="' + idx + '"]');
   if (el) el.classList.add('target');
 }
 function markLine(){
@@ -400,6 +404,83 @@ function cancelSync(){
   save('songs', s).catch(function(){ toast('Não foi possível salvar a letra'); });
   renderTools(); renderLyrics(); renderView(); renderMini();
   toast('Sincronização cancelada');
+}
+function snapshotTimes(s){
+  return s.lyrics.map(function(l){
+    return Object.prototype.hasOwnProperty.call(l, 't') ? { present:true, value:l.t } : { present:false };
+  });
+}
+function restoreTimes(s, snap){
+  s.lyrics.forEach(function(l, i){
+    var o = snap[i];
+    if (o && o.present) l.t = o.value; else delete l.t;
+  });
+}
+
+/* ---------- Ajuste fino dos tempos ---------- */
+function timedIdx(s){ var out = []; s.lyrics.forEach(function(l, i){ if (l.t != null && l.text) out.push(i); }); return out; }
+function startAdjust(){
+  var s = curSong(); if (!s) return;
+  var timed = timedIdx(s);
+  if (!timed.length) { toast('Sincronize a letra primeiro'); return; }
+  if (state.sync) finishSync(true);
+  var a = activeIdx(s.lyrics, audio.currentTime);
+  var idx = timed.indexOf(a) >= 0 ? a : timed[0];
+  state.adjust = { idx:idx, scope:'line', original:snapshotTimes(s) };
+  renderTools(); renderLyrics();
+  centerLine(idx, true);
+  toast('Toque num verso e use os botões para adiantar ou atrasar');
+}
+function renderAdjust(){
+  var adj = state.adjust, s = curSong(); if (!adj || !s) return;
+  document.querySelectorAll('#adjBar [data-scope]').forEach(function(b){ b.setAttribute('aria-pressed', b.dataset.scope === adj.scope ? 'true' : 'false'); });
+  var l = s.lyrics[adj.idx];
+  $('#aTime').textContent = l && l.t != null ? stamp(l.t) : '—';
+}
+function nudge(delta){
+  var s = curSong(), adj = state.adjust; if (!s || !adj) return;
+  var timed = timedIdx(s), k = timed.indexOf(adj.idx);
+  if (k < 0) return;
+  var dur = isFinite(audio.duration) ? audio.duration : Infinity;
+  var targets, lo, hi;
+  if (adj.scope === 'line') {
+    targets = [adj.idx];
+    lo = k > 0 ? s.lyrics[timed[k-1]].t : 0;
+    hi = k < timed.length - 1 ? s.lyrics[timed[k+1]].t : dur;
+  } else {
+    targets = adj.scope === 'all' ? timed : timed.slice(k);
+    lo = adj.scope === 'all' || k === 0 ? 0 : s.lyrics[timed[k-1]].t;
+    hi = dur;
+  }
+  var firstT = s.lyrics[targets[0]].t, lastT = s.lyrics[targets[targets.length-1]].t;
+  var d = delta;
+  if (firstT + d < lo) d = lo - firstT;
+  if (lastT + d > hi) d = hi - lastT;
+  d = +d.toFixed(2);
+  if (d === 0) { toast(adj.scope === 'line' ? 'Não dá para passar do verso vizinho' : 'Chegou no limite'); return; }
+  targets.forEach(function(i){ s.lyrics[i].t = Math.max(0, +(s.lyrics[i].t + d).toFixed(2)); });
+  if (d !== delta) toast(adj.scope === 'line' ? 'Parou no tempo do verso vizinho' : 'Parou no limite');
+  saveSongSoon(s); lastActive = -2;
+  renderAdjust();
+  audio.currentTime = Math.max(0, s.lyrics[adj.idx].t - 2);
+  if (audio.paused) audio.play().catch(function(){});
+}
+function finishAdjust(silent){
+  var s = curSong();
+  if (s && state.adjust) { clearTimeout(saveTimers[s.id]); delete saveTimers[s.id]; save('songs', s).catch(function(){ toast('Não foi possível salvar a letra'); }); }
+  state.adjust = null;
+  if (!silent) { renderTools(); renderLyrics(); renderView(); }
+}
+function cancelAdjust(){
+  var s = curSong(), adj = state.adjust;
+  if (!s || !adj) return;
+  clearTimeout(saveTimers[s.id]); delete saveTimers[s.id];
+  restoreTimes(s, adj.original);
+  state.adjust = null;
+  save('songs', s).catch(function(){ toast('Não foi possível salvar a letra'); });
+  lastActive = -2;
+  renderTools(); renderLyrics(); renderView();
+  toast('Ajuste cancelado');
 }
 
 /* ---------- Janelas ---------- */
@@ -536,6 +617,7 @@ function exportLrc(s){
 }
 function lyricsEditor(s){
   if (state.sync) finishSync();
+  if (state.adjust) finishAdjust();
   modal('<h2>Letra de “' + esc(s.title) + '”</h2><p>Cole a letra com um verso por linha. Se tiver um arquivo .lrc (letra com tempos), importe ou cole o conteúdo e ela já fica sincronizada.</p>' +
     '<textarea class="field" id="lyrTxt" spellcheck="false" placeholder="Cole a letra aqui"></textarea>' +
     '<div class="m-actions"><button class="btn sec" data-m="imp">Importar .lrc</button><span class="grow"></span><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar letra</button></div>');
@@ -613,7 +695,7 @@ async function deleteSong(id){
   if (cur && cur.id === id) {
     audio.pause(); audio.removeAttribute('src'); audio.load();
     if (curUrl) { URL.revokeObjectURL(curUrl); curUrl = null; }
-    state.queue = []; state.qi = -1; state.sync = null; closePlayer();
+    state.queue = []; state.qi = -1; state.sync = null; state.adjust = null; closePlayer();
   } else if (state.queue.indexOf(id) >= 0) {
     var qi = state.queue.indexOf(id);
     state.queue.splice(qi, 1); if (qi < state.qi) state.qi--;
@@ -656,6 +738,10 @@ document.addEventListener('click', async function(e){
       if (suppressLineClick) { suppressLineClick = false; break; }
       var s = curSong(); if (!s) break;
       if (state.sync) { state.sync.idx = i; markTarget(); break; }
+      if (state.adjust) {
+        if (!s.lyrics[i] || s.lyrics[i].t == null) { toast('Este verso não tem tempo. Use Sincronizar.'); break; }
+        state.adjust.idx = i; markTarget(); renderAdjust(); break;
+      }
       var t = s.lyrics[i] && s.lyrics[i].t;
       if (t != null) { audio.currentTime = t; lastActive = -2; userScrollAt = 0; if (audio.paused) audio.play().catch(function(){}); }
       break;
@@ -667,9 +753,9 @@ $('#pClose').onclick = closePlayer;
 $('#pEdit').onclick = function(){
   var s = curSong(); if (!s) return;
   actionSheet('Letra de “' + s.title + '”', [
-    { label: s.lyrics.length ? 'Editar letra' : 'Adicionar letra', fn:function(){ lyricsEditor(s); } },
-    { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }
-  ]);
+    { label: s.lyrics.length ? 'Editar letra' : 'Adicionar letra', fn:function(){ lyricsEditor(s); } }
+  ].concat(timedIdx(s).length ? [{ label:'Ajustar tempos (±1s, ±5s, ±10s)', fn:startAdjust }] : [])
+   .concat([{ label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }]));
 };
 $('#pNotes').onclick = function(){ if (curSong()) notesEditor(curSong()); };
 $('#bPlay').onclick = toggle;
@@ -691,7 +777,21 @@ $('#bLoop').onclick = function(){
   } else { state.loopA = state.loopB = null; toast('Repetição desligada'); }
   renderTools();
 };
-$('#bSync').onclick = startSync;
+$('#bSync').onclick = function(){
+  var s = curSong(); if (!s) return;
+  if (!timedIdx(s).length) { startSync(); return; }
+  actionSheet('Tempos da letra', [
+    { label:'Ajustar tempos (±1s, ±5s, ±10s)', fn:startAdjust },
+    { label:'Sincronizar de novo, verso por verso', fn:startSync }
+  ]);
+};
+$('#adjBar').addEventListener('click', function(e){
+  var b = e.target.closest('button'); if (!b || !state.adjust) return;
+  if (b.dataset.adj) nudge(+b.dataset.adj);
+  else if (b.dataset.scope) { state.adjust.scope = b.dataset.scope; renderAdjust(); }
+  else if (b.id === 'aDone') { finishAdjust(); toast('Tempos salvos'); }
+  else if (b.id === 'aCancel') cancelAdjust();
+});
 $('#sMark').onclick = markLine;
 $('#sUndo').onclick = undoLine;
 $('#sDone').onclick = function(){ finishSync(); toast('Sincronização salva'); };
@@ -741,6 +841,7 @@ audio.addEventListener('loadedmetadata', function(){
 });
 audio.addEventListener('ended', function(){
   if (state.sync) finishSync();
+  if (state.adjust) { setPlayIcons(); return; }
   if (state.qi < state.queue.length - 1) playAt(state.qi + 1);
   else { audio.currentTime = 0; setPlayIcons(); }
 });

@@ -18,6 +18,7 @@ Letras
 Letra rolando junto com a música, com o verso atual destacado
 Toque num verso para pular para ele
 Sincronização manual: dê play e toque em Marcar linha no começo de cada verso
+Ajuste fino dos tempos sem digitar: escolha um verso e use os botões −10 s, −5 s, −1 s, +1 s, +5 s e +10 s para ele acender antes ou depois. Dá para ajustar só esse verso, ele e todos os seguintes, ou a letra toda. A cada toque a música volta 2 s antes do verso para você conferir, e Cancelar desfaz tudo
 Importação e exportação de arquivos .lrc
 
 Ferramentas de ensaio
@@ -39,6 +40,8 @@ Manual de uso completo dentro do próprio app
 Como usar
 
 Abra a página no navegador do celular e toque em Adicionar músicas. O manual completo está na aba Ajuda do app.
+
+Para corrigir um verso fora de tempo, abra o player, toque em Sincronizar e escolha Ajustar tempos (também tem esse item no menu Letra).
 
 Publicar a sua cópia (grátis)
 

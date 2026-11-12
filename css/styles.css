@@ -119,6 +119,16 @@ textarea.field.notes-ta{min-height:9rem}
 .syncbar{display:grid;grid-template-columns:1fr 1.8fr 1fr;gap:8px}
 #sCancel{grid-column:1/-1}
 .mark{background:var(--btn);color:var(--btn-ink);border:0;border-radius:14px;font-weight:700;font-size:1.1rem;padding:18px 6px}
+.adjbar{display:grid;gap:8px}
+.adj-scope{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.adj-scope .tool{font-size:.85rem;line-height:1.15}
+.adj-steps{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}
+.adj-steps .tool{padding:10px 0;font-variant-numeric:tabular-nums}
+.adj-steps .tool:nth-child(3){margin-right:6px}
+.adj-foot{display:grid;grid-template-columns:1.2fr 1fr 1.2fr;gap:8px;align-items:stretch}
+.adj-foot .mark{padding:10px 6px;font-size:1rem}
+.adj-time{display:flex;flex-direction:column;justify-content:center;align-items:center;font-weight:700;font-variant-numeric:tabular-nums;font-size:1.05rem}
+.adj-k{font-size:.72rem;font-weight:400;color:var(--muted)}
 
 /* Modal */
 .modal{position:fixed;inset:0;z-index:40;background:var(--scrim);display:flex;align-items:flex-end;justify-content:center}
