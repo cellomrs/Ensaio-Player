@@ -9,7 +9,7 @@ var ICON = {
   down:'<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>',
   x:'<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg>'
 };
-var state = { songs:[], playlists:[], pending:[], queue:[], qi:-1, queueName:'', view:'library', openPl:null, sync:null, adjust:null, loopA:null, loopB:null, rate:1 };
+var state = { songs:[], playlists:[], pending:[], queue:[], qi:-1, queueName:'', view:'library', openPl:null, sync:null, adjust:null, loopA:null, loopB:null, loopPart:null, rate:1 };
 var db = null;
 var mem = { songs:new Map(), audio:new Map(), playlists:new Map(), pending:new Map() };
 var audio = new Audio();
@@ -84,31 +84,125 @@ function lyricStatus(s){
 function songSub(s){ return (s.duration ? fmt(s.duration) + ', ' : '') + lyricStatus(s) + (s.notes || s.lyrics.some(function(l){ return l.note; }) ? ', com observações' : ''); }
 
 /* ---------- Letras ---------- */
+var STAMP_RE = /^\s*\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/;
+function takeStamps(raw){
+  var rest = raw, tags = [], m;
+  while ((m = STAMP_RE.exec(rest))) { tags.push(+m[1]*60 + parseFloat(m[2].replace(':','.'))); rest = rest.slice(m[0].length); }
+  return { tags:tags, rest:rest, prefix:raw.slice(0, raw.length - rest.length) };
+}
+function isBlank(l){ return !l.text && l.t == null && !(l.chords && l.chords.length); }
 function parseLyrics(txt){
   var out = [];
-  txt.replace(/\r/g,'').split('\n').forEach(function(raw){
+  mergeChordLines(txt.replace(/\r/g,'').split('\n')).forEach(function(raw){
     if (/^\s*\[(ar|ti|al|by|offset|length|re|ve|au|#)\s*:/i.test(raw)) return;
-    var rest = raw, tags = [], m;
-    while ((m = /^\s*\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/.exec(rest))) {
-      tags.push(+m[1]*60 + parseFloat(m[2].replace(':','.')));
-      rest = rest.slice(m[0].length);
-    }
-    var text = rest.trim();
-    if (tags.length) tags.forEach(function(t){ out.push({t:+t.toFixed(2), text:text}); });
-    else out.push({t:null, text:text});
+    if (/^\s*\{[^}]*\}\s*$/.test(raw)) return;   /* diretivas ChordPro, como {title: …} */
+    var st = takeStamps(raw), sc = splitChords(st.rest);
+    function line(t){ var l = { t:t, text:sc.text }; if (sc.chords.length) l.chords = sc.chords.map(function(c){ return { i:c.i, c:c.c }; }); return l; }
+    if (st.tags.length) st.tags.forEach(function(t){ out.push(line(+t.toFixed(2))); });
+    else out.push(line(null));
   });
-  var allTimed = out.some(function(l){ return l.t != null; }) && out.every(function(l){ return l.t != null || !l.text; });
+  var allTimed = out.some(function(l){ return l.t != null; }) && out.every(function(l){ return l.t != null || isBlank(l); });
   if (allTimed) out = out.filter(function(l){ return l.t != null; }).sort(function(a,b){ return a.t - b.t; });
   var clean = [];
   out.forEach(function(l){
-    var blank = !l.text && l.t == null;
-    if (blank && (!clean.length || (!clean[clean.length-1].text && clean[clean.length-1].t == null))) return;
+    if (isBlank(l) && (!clean.length || isBlank(clean[clean.length-1]))) return;
     clean.push(l);
   });
-  while (clean.length && !clean[clean.length-1].text && clean[clean.length-1].t == null) clean.pop();
+  while (clean.length && isBlank(clean[clean.length-1])) clean.pop();
   return clean;
 }
-function lyricsToText(lines){ return lines.map(function(l){ return l.t != null ? '[' + stamp(l.t) + ']' + l.text : l.text; }).join('\n'); }
+function lyricsToText(lines, withChords){
+  return lines.map(function(l){
+    var body = withChords && l.chords && l.chords.length ? joinChords(l.text, l.chords) : l.text;
+    return l.t != null ? '[' + stamp(l.t) + ']' + body : body;
+  }).join('\n');
+}
+
+/* ---------- Cifras: acordes guardados à parte do texto ({ i: posição no texto, c: acorde }) ---------- */
+var CHORD_RE = /^[A-G](?:#|b)?(?:m|M|maj|min|dim|aug|sus|add|º|°|ø|\+|-|\d|\(|\)|#|b|\/[A-G](?:#|b)?)*$/;
+function isChord(tok){ return CHORD_RE.test(tok); }
+function splitChords(raw){
+  var text = '', chords = [], last = 0, m, re = /\[([^\]\s]{1,12})\]/g;
+  while ((m = re.exec(raw))) {
+    if (!isChord(m[1])) continue;
+    text += raw.slice(last, m.index); chords.push({ i:text.length, c:m[1] }); last = m.index + m[0].length;
+  }
+  text += raw.slice(last);
+  var lead = text.length - text.replace(/^\s+/, '').length;
+  text = text.trim();
+  chords.forEach(function(c){ c.i = Math.max(0, Math.min(text.length, c.i - lead)); });
+  return { text:text, chords:chords };
+}
+function joinChords(text, chords){
+  if (!chords || !chords.length) return text;
+  if (!text) return chords.map(function(c){ return '[' + c.c + ']'; }).join(' ');
+  var out = text;
+  chords.slice().sort(function(a, b){ return b.i - a.i; }).forEach(function(c){ out = out.slice(0, c.i) + '[' + c.c + ']' + out.slice(c.i); });
+  return out;
+}
+/* Formato dos sites de cifra: uma linha só com acordes em cima do verso */
+function isChordLine(str){
+  if (!str.trim() || /[\[\]{}:]/.test(str)) return false;
+  var toks = str.trim().split(/\s+/), n = 0;
+  for (var i = 0; i < toks.length; i++) {
+    if (isChord(toks[i])) n++;
+    else if (!/^(\||-+|–|\.+|\(?\d+x\)?)$/i.test(toks[i])) return false;
+  }
+  return n > 0;
+}
+function mergeChordLines(lines){
+  var out = [];
+  for (var i = 0; i < lines.length; i++) {
+    var cur = lines[i];
+    if (!isChordLine(cur)) { out.push(cur); continue; }
+    var next = lines[i + 1], st = next != null ? takeStamps(next) : null;
+    if (next != null && st.rest.trim() && !isChordLine(next)) {
+      var lyr = st.rest, m, re = /\S+/g, ins = [];
+      while ((m = re.exec(cur))) if (isChord(m[0])) ins.push({ col:m.index, c:m[0] });
+      ins.sort(function(a, b){ return b.col - a.col; }).forEach(function(x){
+        while (lyr.length < x.col) lyr += ' ';
+        lyr = lyr.slice(0, x.col) + '[' + x.c + ']' + lyr.slice(x.col);
+      });
+      out.push(st.prefix + lyr); i++;
+    } else {
+      out.push(cur.trim().split(/\s+/).filter(isChord).map(function(c){ return '[' + c + ']'; }).join(' '));
+    }
+  }
+  return out;
+}
+var NOTES_S = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'], NOTES_F = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+var NOTE_ALIAS = { 'E#':'F', 'B#':'C', 'Fb':'E', 'Cb':'B' };
+function transposeNote(note, n, flat){
+  note = NOTE_ALIAS[note] || note;
+  var k = NOTES_S.indexOf(note); if (k < 0) k = NOTES_F.indexOf(note); if (k < 0) return note;
+  return (flat ? NOTES_F : NOTES_S)[((k + n) % 12 + 12) % 12];
+}
+function transposeChord(c, n){
+  if (!n) return c;
+  var m = /^([A-G](?:#|b)?)(.*?)(?:\/([A-G](?:#|b)?))?$/.exec(c); if (!m) return c;
+  var flat = m[1].length > 1 && m[1][1] === 'b';
+  return transposeNote(m[1], n, flat) + m[2] + (m[3] ? '/' + transposeNote(m[3], n, flat || (m[3].length > 1 && m[3][1] === 'b')) : '');
+}
+function hasChords(s){ return !!s && s.lyrics.some(function(l){ return l.chords && l.chords.length; }); }
+function songKey(s){
+  for (var i = 0; i < s.lyrics.length; i++) {
+    var ch = s.lyrics[i].chords;
+    if (ch && ch.length) { var m = /^[A-G](?:#|b)?(?:m(?!aj))?/.exec(ch.slice().sort(function(a, b){ return a.i - b.i; })[0].c); return m ? m[0] : null; }
+  }
+  return null;
+}
+function chordsOn(){ try { return localStorage.getItem('ensaio-chords') !== 'off'; } catch(e){ return true; } }
+function chordsHtml(l, n){
+  var ch = l.chords.slice().sort(function(a, b){ return a.i - b.i; }), text = l.text, out = '';
+  if (!text) return '<span class="ch-only">' + ch.map(function(c){ return '<b>' + esc(transposeChord(c.c, n)) + '</b>'; }).join('') + '</span>';
+  if (ch[0].i > 0) out += esc(text.slice(0, ch[0].i));
+  ch.forEach(function(c, k){
+    var end = k + 1 < ch.length ? ch[k + 1].i : text.length, seg = text.slice(c.i, end), name = transposeChord(c.c, n);
+    var short = seg.length < name.length + 1;
+    out += '<span class="cs' + (short ? ' short' : '') + '"' + (short ? ' style="min-width:' + (name.length * 0.42 + 0.5).toFixed(2) + 'em"' : '') + '><b class="ch">' + esc(name) + '</b>' + (seg ? esc(seg) : '&nbsp;') + '</span>';
+  });
+  return out;
+}
 function nextLine(s, from){ for (var i = Math.max(0,from); i < s.lyrics.length; i++) if (s.lyrics[i].text.trim()) return i; return -1; }
 function prevLine(s, from){ for (var i = Math.min(from, s.lyrics.length-1); i >= 0; i--) if (s.lyrics[i].text.trim()) return i; return -1; }
 function activeIdx(lines, t){ var a = -1; for (var i = 0; i < lines.length; i++) { var l = lines[i]; if (l.t != null && l.t <= t + 0.05 && (a < 0 || l.t >= lines[a].t)) a = i; } return a; }
@@ -317,6 +411,143 @@ function renderPlayerHead(){
   $('#pSub').textContent = s ? (state.qi+1) + ' de ' + state.queue.length + ', ' + state.queueName : '';
 }
 function renderPlayer(){ renderPlayerHead(); renderNotes(); renderLyrics(); renderTools(); setPlayIcons(); }
+
+/* ---------- Partes da música (Intro, Verso, Refrão…) ---------- */
+var PART_NAMES = ['Intro', 'Verso', 'Pré-refrão', 'Refrão', 'Ponte', 'Solo', 'Final'];
+var LOOP_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M17 2l3 3-3 3M4 11V9a4 4 0 0 1 4-4h12M7 22l-3-3 3-3M20 13v2a4 4 0 0 1-4 4H4"/></svg>';
+var lastPart = -2;
+function partsOf(s){ return (s && s.parts) || []; }
+function partAt(s, t){ var p = partsOf(s), k = -1; for (var i = 0; i < p.length; i++) if (p[i].t <= t + 0.05) k = i; return k; }
+function partRange(s, k){
+  var p = partsOf(s), d = audio.duration || s.duration || 0;
+  return { a: p[k].t, b: k + 1 < p.length ? p[k + 1].t : (d || p[k].t + 30) };
+}
+function sortParts(s){ s.parts.sort(function(a, b){ return a.t - b.t; }); }
+function saveSong(s){ return save('songs', s).catch(function(){ toast('Não foi possível salvar'); }); }
+/* Rótulo da parte antes do primeiro verso sincronizado dela */
+function partTags(s){
+  var out = {}, ps = partsOf(s);
+  ps.forEach(function(p, k){
+    var end = k + 1 < ps.length ? ps[k + 1].t - 0.3 : Infinity;
+    for (var i = 0; i < s.lyrics.length; i++) {
+      var l = s.lyrics[i];
+      if (l.t != null && (l.text || (l.chords && l.chords.length)) && l.t >= p.t - 0.3) { if (l.t < end) out[i] = out[i] ? out[i] + ' · ' + p.name : p.name; return; }
+    }
+  });
+  return out;
+}
+function renderParts(){
+  var s = curSong(), box = $('#parts'), marks = $('#partMarks');
+  if (!s) { box.innerHTML = ''; marks.innerHTML = ''; return; }
+  var p = partsOf(s), cur = partAt(s, audio.currentTime); lastPart = cur;
+  box.innerHTML = p.map(function(x, k){
+    var loop = state.loopPart === x;
+    return '<button class="part-chip' + (k === cur ? ' on' : '') + (loop ? ' looping' : '') + '" data-k="' + k + '" aria-label="' + esc(x.name) + ', ' + fmt(x.t) + (loop ? ', repetindo' : '') + '. Segure para mais opções">' +
+      (loop ? LOOP_SVG : '') + '<span class="pn">' + esc(x.name) + '</span><span class="pt">' + fmt(x.t) + '</span></button>';
+  }).join('') + '<button class="part-chip add" data-add="1" aria-label="Marcar uma parte no tempo atual">+ Parte</button>';
+  var d = audio.duration || s.duration;
+  marks.innerHTML = d ? p.map(function(x){ return '<span class="pmk" style="left:' + Math.min(100, x.t / d * 100) + '%"></span>'; }).join('') : '';
+}
+function updatePartActive(){
+  var s = curSong(); if (!s || !partsOf(s).length) return;
+  var cur = partAt(s, audio.currentTime); if (cur === lastPart) return;
+  lastPart = cur;
+  var box = $('#parts');
+  box.querySelectorAll('.part-chip[data-k]').forEach(function(el){
+    var on = +el.dataset.k === cur; el.classList.toggle('on', on);
+    if (on && Date.now() - partsTouchAt > 3000) box.scrollTo({ left: el.offsetLeft - box.clientWidth / 2 + el.offsetWidth / 2, behavior: reduceMotion ? 'auto' : 'smooth' });
+  });
+}
+var partsTouchAt = 0;
+function loopPart(p, quiet){
+  var s = curSong(), k = partsOf(s).indexOf(p); if (k < 0) return;
+  var r = partRange(s, k);
+  if (r.b - r.a < 1) { toast('Esta parte é curta demais para repetir'); return; }
+  state.loopA = r.a; state.loopB = r.b; state.loopPart = p;
+  audio.currentTime = r.a; lastActive = -2; userScrollAt = 0;
+  if (audio.paused) audio.play().catch(function(){});
+  renderTools();
+  if (!quiet) toast('Repetindo ' + p.name);
+}
+function stopLoop(){ state.loopA = state.loopB = null; state.loopPart = null; renderTools(); toast('Repetição desligada'); }
+function jumpPart(k){
+  var s = curSong(), p = partsOf(s)[k]; if (!p) return;
+  if (state.loopPart && state.loopPart !== p) { loopPart(p); return; }
+  audio.currentTime = p.t; lastActive = -2; lastPart = -2; userScrollAt = 0;
+  if (audio.paused) audio.play().catch(function(){});
+}
+function uniquePartName(s, base, except){
+  var names = partsOf(s).filter(function(x){ return x !== except; }).map(function(x){ return normTitle(x.name); });
+  if (names.indexOf(normTitle(base)) < 0) return base;
+  for (var n = 2; ; n++) if (names.indexOf(normTitle(base + ' ' + n)) < 0) return base + ' ' + n;
+}
+function choosePartName(s, title, except, done){
+  actionSheet(title, PART_NAMES.map(function(n){ return { label:n, fn:function(){ done(uniquePartName(s, n, except)); } }; }).concat([
+    { label:'Outro nome…', fn:async function(){ var n = await askText('Nome da parte', except ? except.name : '', 'Salvar'); if (n && n.trim()) done(uniquePartName(s, n.trim().slice(0, 30), except)); } }
+  ]));
+}
+function partNear(s, t, except){ return partsOf(s).some(function(x){ return x !== except && Math.abs(x.t - t) < 1; }); }
+function addPart(){
+  var s = curSong(); if (!s || !audio.src) return;
+  if (state.sync || state.adjust) { toast('Termine a sincronização antes'); return; }
+  var t = +audio.currentTime.toFixed(2);
+  if (partNear(s, t)) { toast('Já tem uma parte começando aqui'); return; }
+  choosePartName(s, 'Nova parte em ' + fmt(t), null, function(name){
+    s.parts = partsOf(s).concat([{ t:t, name:name }]); sortParts(s);
+    saveSong(s); renderTools(); renderLyrics(); toast('Parte marcada: ' + name);
+  });
+}
+function partMenu(k){
+  var s = curSong(), p = partsOf(s)[k]; if (!p) return;
+  var looping = state.loopPart === p;
+  actionSheet(p.name + ' (' + fmt(p.t) + ')', [
+    { label: looping ? 'Parar de repetir' : 'Repetir esta parte', fn:function(){ if (looping) stopLoop(); else loopPart(p); } },
+    { label:'Começa agora (' + fmt(audio.currentTime) + ')', fn:function(){
+      var t = +audio.currentTime.toFixed(2);
+      if (partNear(s, t, p)) { toast('Já tem outra parte começando aqui'); return; }
+      p.t = t; sortParts(s); saveSong(s);
+      if (state.loopPart === p) loopPart(p, true); else renderTools();
+      renderLyrics(); toast(p.name + ' agora começa em ' + fmt(t));
+    } },
+    { label:'Renomear', fn:function(){ choosePartName(s, 'Renomear “' + p.name + '”', p, function(n){ p.name = n; saveSong(s); renderTools(); renderLyrics(); }); } },
+    { label:'Apagar parte', danger:true, fn:function(){
+      s.parts.splice(s.parts.indexOf(p), 1);
+      if (state.loopPart === p) { state.loopA = state.loopB = null; state.loopPart = null; }
+      saveSong(s); renderTools(); renderLyrics(); toast('Parte apagada');
+    } }
+  ]);
+}
+
+/* ---------- Cifras: mostrar/esconder e transpor ---------- */
+function toggleChords(){
+  var on = !chordsOn();
+  try { localStorage.setItem('ensaio-chords', on ? 'on' : 'off'); } catch(e){}
+  renderLyrics(); toast(on ? 'Cifras visíveis' : 'Cifras escondidas');
+}
+function transposeSheet(s){
+  if (!hasChords(s)) { toast('Esta letra ainda não tem cifras'); return; }
+  function body(){
+    var n = s.transpose || 0, k = songKey(s);
+    return '<h2>Tom de “' + esc(s.title) + '”</h2>' +
+      '<p class="tr-now">' + (k ? 'Original <b>' + esc(k) + '</b> → agora <b>' + esc(transposeChord(k, n)) + '</b>' : 'Agora') + ' <span>(' + (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n) + (Math.abs(n) === 1 ? ' semitom' : ' semitons') + ')</span></p>' +
+      '<div class="tr-row"><button class="btn sec" data-m="-1" aria-label="Descer meio tom">−1</button>' +
+      '<button class="btn sec" data-m="0"' + (n === 0 ? ' disabled' : '') + '>Tom original</button>' +
+      '<button class="btn sec" data-m="1" aria-label="Subir meio tom">+1</button></div>' +
+      '<p class="small">Muda só os acordes mostrados nesta música. O áudio continua no tom gravado.</p>' +
+      '<div class="m-actions"><span class="grow"></span><button class="btn" data-m="x">Pronto</button></div>';
+  }
+  modal(body());
+  $('#sheet').onclick = function(e){
+    var b = e.target.closest('[data-m]'); if (!b || b.disabled) return;
+    if (b.dataset.m === 'x') { closeModal(); return; }
+    var n = b.dataset.m === '0' ? 0 : (s.transpose || 0) + (+b.dataset.m);
+    if (n > 11) n -= 12; if (n < -11) n += 12;
+    if (n) s.transpose = n; else delete s.transpose;
+    saveSong(s); $('#sheet').innerHTML = body(); if (curSong() === s) renderLyrics();
+  };
+}
+
+
 function renderNotes(){
   var s = curSong(), el = $('#pNotes');
   if (!s) { el.hidden = true; return; }
@@ -331,10 +562,15 @@ function renderLyrics(){
   if (!s.lyrics.length) { box.innerHTML = '<div class="l-empty"><p>Esta música ainda não tem letra.</p><button class="btn" data-act="editlyrics">Adicionar letra</button></div>'; return; }
   var synced = s.lyrics.some(function(l){ return l.t != null; });
   var useSpacer = synced || state.sync;
+  var showCh = chordsOn(), tr = s.transpose || 0, tags = synced ? partTags(s) : {};
   box.innerHTML = (useSpacer ? '<div class="spacer"></div>' : '<p class="hint">Esta letra ainda não tem tempos. Toque em “Sincronizar” e marque o começo de cada verso enquanto a música toca.</p>') +
     s.lyrics.map(function(l, i){
-      return l.text ? '<div class="line' + (l.t != null ? ' timed' : '') + '" data-act="line" data-i="' + i + '">' + esc(l.text) + (l.note ? '<span class="lnote">' + esc(l.note) + '</span>' : '') + '</div>' : '<div class="gap"></div>';
-    }).join('') + '<p class="lhint">Segure uma linha para escrever uma anotação nela.</p><div class="spacer"></div>';
+      var ch = showCh && l.chords && l.chords.length;
+      var tag = tags[i] ? '<div class="part-tag">' + esc(tags[i]) + '</div>' : '';
+      if (!l.text && !ch) return tag + (l.chords && l.chords.length ? '' : '<div class="gap"></div>');
+      return tag + '<div class="line' + (l.t != null ? ' timed' : '') + (ch ? ' has-ch' + (l.text ? '' : ' ch-line') : '') + '" data-act="line" data-i="' + i + '">' +
+        (ch ? chordsHtml(l, tr) : esc(l.text)) + (l.note ? '<span class="lnote">' + esc(l.note) + '</span>' : '') + '</div>';
+    }).join('') + '<p class="lhint">Segure um verso para corrigir o texto' + (hasChords(s) ? ', os acordes' : '') + ' ou escrever uma anotação.</p><div class="spacer"></div>';
   if (state.sync || state.adjust) markTarget();
   updateActive();
 }
@@ -373,6 +609,7 @@ function renderTools(){
   rb.innerHTML = r.icon; rb.setAttribute('aria-label', 'Ao terminar: ' + r.label + '. Toque para mudar');
   rb.setAttribute('aria-pressed', repeatMode !== 'next' ? 'true' : 'false');
   var syncing = !!state.sync, adj = state.adjust;
+  renderParts(); $('#parts').hidden = syncing || !!adj;
   $('#tools').hidden = syncing || !!adj; $('#syncBar').hidden = !syncing; $('#adjBar').hidden = !adj;
   if (adj) renderAdjust();
 }
@@ -388,7 +625,7 @@ async function playAt(i){
   curUrl = URL.createObjectURL(new Blob([a.buf], {type: a.type}));
   audio.src = curUrl;
   applyRate();
-  state.loopA = state.loopB = null;
+  state.loopA = state.loopB = null; state.loopPart = null; lastPart = -2;
   try { await audio.play(); } catch(e){}
   updateMediaSession();
   renderMini(); renderPlayer(); renderView();
@@ -459,6 +696,7 @@ function tick(){
     if (!seeking) $('#tCur').textContent = fmt(audio.currentTime);
     $('#tDur').textContent = fmt(d);
     updateActive();
+    updatePartActive();
   }
   checkLoop();
   requestAnimationFrame(tick);
@@ -725,26 +963,28 @@ function carryNotes(oldL, newL){
   });
   return pool.length;
 }
-function cleanVerse(v){ return String(v || '').replace(/[\r\n]+/g, ' ').replace(/^\s*(\[[^\]]*\]\s*)+/, '').trim(); }
+function cleanVerse(v){ return String(v || '').replace(/[\r\n]+/g, ' ').replace(/^\s*(\[\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?\]\s*)+/, '').trim(); }
 function lineEditor(s, i){
   var l = s.lyrics[i]; if (!l) return;
   modal('<h2>Editar verso</h2>' +
     (l.t != null ? '<p class="small">Começa em ' + fmt(l.t) + '. O tempo continua o mesmo.</p>' : '') +
     '<label class="m-lbl" for="lvTxt">Texto do verso</label>' +
-    '<input class="field" id="lvTxt" maxlength="300" autocomplete="off">' +
+    '<input class="field" id="lvTxt" maxlength="400" autocomplete="off" spellcheck="false">' +
+    (hasChords(s) ? '<p class="small field-hint">Acordes entre colchetes, antes da sílaba: [G]terra</p>' : '') +
     '<label class="m-lbl" for="lnTxt">Anotação <span>(opcional)</span></label>' +
     '<textarea class="field notes-ta ln-ta" id="lnTxt" maxlength="200" placeholder="Ex.: entra a segunda voz"></textarea>' +
     '<div class="m-actions"><button class="btn ghost" data-m="del" aria-label="Apagar verso">Apagar</button><span class="grow"></span>' +
     '<button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>');
-  $('#lvTxt').value = l.text; $('#lnTxt').value = l.note || '';
+  $('#lvTxt').value = joinChords(l.text, l.chords); $('#lnTxt').value = l.note || '';
   $('#sheet').onclick = async function(e){
     var b = e.target.closest('[data-m]'); if (!b) return;
     var m = b.dataset.m;
     if (m === 'x') { closeModal(); return; }
     if (m === 'ok') {
-      var text = cleanVerse($('#lvTxt').value), note = $('#lnTxt').value.trim();
-      if (!text) { toast('Escreva o verso ou use Apagar'); $('#lvTxt').focus(); return; }
-      l.text = text; if (note) l.note = note; else delete l.note;
+      var sc = splitChords(cleanVerse($('#lvTxt').value)), note = $('#lnTxt').value.trim();
+      if (!sc.text && !sc.chords.length) { toast('Escreva o verso ou use Apagar'); $('#lvTxt').focus(); return; }
+      l.text = sc.text; if (sc.chords.length) l.chords = sc.chords; else delete l.chords;
+      if (note) l.note = note; else delete l.note;
       closeModal();
       try { await save('songs', s); toast('Verso salvo'); } catch(err){ toast('Não foi possível salvar o verso'); }
     } else if (m === 'del') {
@@ -775,7 +1015,7 @@ function exportLrc(s){
   var synced = lines.some(function(l){ return l.t != null; });
   modal('<h2>Exportar letra</h2><p>' +
     (synced ? 'O arquivo .lrc leva a letra com os tempos e abre em outros players que mostram letra sincronizada.' : 'Esta letra ainda não tem tempos, então o arquivo sai só com o texto.') +
-    ' Observações e anotações nas linhas não vão junto, porque o formato .lrc não tem lugar para elas.' +
+    ' Acordes, observações e anotações nas linhas não vão junto, porque o formato .lrc não tem lugar para eles.' +
     (downloadsNs ? ' Ao baixar, o arquivo vem como .lrc.txt: é só renomear tirando o .txt.' : '') + '</p>' +
     '<textarea class="field notes-ta" id="lrcOut" readonly></textarea>' +
     '<div class="m-actions"><button class="btn ghost" data-m="x">Fechar</button><span class="grow"></span><button class="btn sec" data-m="copy">Copiar texto</button>' +
@@ -803,10 +1043,10 @@ function exportLrc(s){
 function lyricsEditor(s){
   if (state.sync) finishSync();
   if (state.adjust) finishAdjust();
-  modal('<h2>Letra de “' + esc(s.title) + '”</h2><p>Cole a letra com um verso por linha. Se tiver um arquivo .lrc (letra com tempos), importe ou cole o conteúdo e ela já fica sincronizada.</p>' +
+  modal('<h2>Letra de “' + esc(s.title) + '”</h2><p>Cole a letra com um verso por linha. Se tiver um arquivo .lrc (letra com tempos), importe ou cole o conteúdo e ela já fica sincronizada. Cifra também vale: acordes entre colchetes antes da sílaba, como <b>[G]terra</b>, ou numa linha só de acordes em cima do verso, como nos sites de cifra.</p>' +
     '<textarea class="field" id="lyrTxt" spellcheck="false" placeholder="Cole a letra aqui"></textarea>' +
     '<div class="m-actions"><button class="btn sec" data-m="imp">Importar .lrc</button><span class="grow"></span><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar letra</button></div>');
-  $('#lyrTxt').value = lyricsToText(s.lyrics);
+  $('#lyrTxt').value = lyricsToText(s.lyrics, true);
   $('#sheet').onclick = async function(e){
     var b = e.target.closest('[data-m]'); if (!b) return;
     if (b.dataset.m === 'imp') { $('#lrcFile').value = ''; $('#lrcFile').click(); return; }
@@ -837,14 +1077,25 @@ function cleanLyrics(arr){
     var o = { text: typeof l.text === 'string' ? l.text.slice(0, 500) : '' };
     if (typeof l.t === 'number' && isFinite(l.t) && l.t >= 0) o.t = +l.t.toFixed(2); else if ('t' in l) o.t = null;
     if (typeof l.note === 'string' && l.note.trim()) o.note = l.note.slice(0, 200);
+    if (Array.isArray(l.chords)) {
+      var cs = l.chords.filter(function(c){ return c && typeof c.c === 'string' && c.c.trim() && typeof c.i === 'number' && isFinite(c.i); }).slice(0, 40)
+        .map(function(c){ return { i: Math.max(0, Math.min(o.text.length, Math.round(c.i))), c: c.c.trim().slice(0, 12) }; });
+      if (cs.length) o.chords = cs;
+    }
     return o;
   });
 }
+function cleanParts(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(p){ return p && typeof p.t === 'number' && isFinite(p.t) && p.t >= 0 && typeof p.name === 'string' && p.name.trim(); }).slice(0, 40)
+    .map(function(p){ return { t: +p.t.toFixed(2), name: p.name.trim().slice(0, 30) }; }).sort(function(a, b){ return a.t - b.t; });
+}
+function cleanTranspose(n){ n = Math.round(+n); return isFinite(n) && n >= -11 && n <= 11 ? n : 0; }
 function buildExport(){
   var songs = state.songs.map(function(s){
-    return { title:s.title, notes:s.notes || '', duration:s.duration || null, lyrics:cleanLyrics(s.lyrics) };
+    return { title:s.title, notes:s.notes || '', duration:s.duration || null, lyrics:cleanLyrics(s.lyrics), parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose) };
   }).concat(state.pending.map(function(p){
-    return { title:p.title, notes:p.notes || '', duration:p.duration || null, lyrics:cleanLyrics(p.lyrics) };
+    return { title:p.title, notes:p.notes || '', duration:p.duration || null, lyrics:cleanLyrics(p.lyrics), parts:cleanParts(p.parts), transpose:cleanTranspose(p.transpose) };
   }));
   var playlists = state.playlists.map(function(p){
     var order = p.songIds.map(function(id){ var s = songById(id); return s ? s.title : null; }).filter(Boolean);
@@ -899,7 +1150,8 @@ function parseImport(text){
   return {
     songs: data.songs.filter(function(s){ return s && typeof s.title === 'string' && s.title.trim(); }).map(function(s){
       return { title:s.title.trim().slice(0, 120), notes: typeof s.notes === 'string' ? s.notes.slice(0, 1000) : '',
-        duration: typeof s.duration === 'number' && isFinite(s.duration) ? s.duration : null, lyrics:cleanLyrics(s.lyrics) };
+        duration: typeof s.duration === 'number' && isFinite(s.duration) ? s.duration : null, lyrics:cleanLyrics(s.lyrics),
+        parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose) };
     }),
     playlists: (Array.isArray(data.playlists) ? data.playlists : []).filter(function(p){ return p && typeof p.name === 'string' && p.name.trim() && Array.isArray(p.songs); }).map(function(p){
       return { name:p.name.trim().slice(0, 120), songs:p.songs.filter(function(t){ return typeof t === 'string' && t.trim(); }) };
@@ -927,7 +1179,7 @@ async function importData(text){
   var missing = data.songs.filter(function(s){ return !match[normTitle(s.title)]; });
   var plSame = data.playlists.filter(function(p){ return state.playlists.some(function(x){ return normTitle(x.name) === normTitle(p.name); }); }).length;
   var parts = [];
-  if (found.length) parts.push('<li><b>' + found.length + (found.length === 1 ? ' música' : ' músicas') + '</b> deste aparelho ' + (found.length === 1 ? 'recebe' : 'recebem') + ' a letra, as observações e as anotações do arquivo. O que elas têm hoje é substituído.</li>');
+  if (found.length) parts.push('<li><b>' + found.length + (found.length === 1 ? ' música' : ' músicas') + '</b> deste aparelho ' + (found.length === 1 ? 'recebe' : 'recebem') + ' a letra (com cifras e partes), as observações e as anotações do arquivo. O que elas têm hoje é substituído.</li>');
   if (missing.length) parts.push('<li><b>' + missing.length + (missing.length === 1 ? ' música' : ' músicas') + '</b> ainda não ' + (missing.length === 1 ? 'está' : 'estão') + ' aqui. A letra fica esperando: ao adicionar um áudio com o mesmo nome, ela entra sozinha.</li>');
   if (data.playlists.length) parts.push('<li><b>' + data.playlists.length + (data.playlists.length === 1 ? ' playlist' : ' playlists') + '</b>' + (plSame ? ' (' + plSame + ' com nome igual a uma daqui, que terá a ordem substituída)' : '') + '.</li>');
   var ok = await new Promise(function(res){
@@ -941,13 +1193,14 @@ async function importData(text){
   try {
     for (var i = 0; i < found.length; i++) {
       var src = found[i], s = match[normTitle(src.title)];
-      s.lyrics = src.lyrics; s.notes = src.notes;
+      s.lyrics = src.lyrics; s.notes = src.notes; s.parts = src.parts;
+      if (src.transpose) s.transpose = src.transpose; else delete s.transpose;
       if (!s.duration && src.duration) s.duration = src.duration;
       await save('songs', s);
     }
     for (var j = 0; j < missing.length; j++) {
       var m = missing[j], pid = normTitle(m.title);
-      var pend = { id:pid, title:m.title, lyrics:m.lyrics, notes:m.notes, duration:m.duration };
+      var pend = { id:pid, title:m.title, lyrics:m.lyrics, notes:m.notes, duration:m.duration, parts:m.parts, transpose:m.transpose };
       await save('pending', pend);
       state.pending = state.pending.filter(function(p){ return p.id !== pid; }).concat([pend]);
     }
@@ -976,7 +1229,8 @@ async function applyPending(song){
   var k = normTitle(song.title), changed = false;
   var p = state.pending.find(function(x){ return x.id === k; });
   if (p) {
-    song.title = p.title; song.lyrics = p.lyrics || []; song.notes = p.notes || '';
+    song.title = p.title; song.lyrics = p.lyrics || []; song.notes = p.notes || ''; song.parts = p.parts || [];
+    if (p.transpose) song.transpose = p.transpose;
     await save('songs', song);
     state.pending = state.pending.filter(function(x){ return x !== p; });
     await remove('pending', p.id);
@@ -1132,7 +1386,7 @@ document.addEventListener('click', async function(e){
     case 'toggle': toggle(); break;
     case 'editlyrics': if (curSong()) lyricsEditor(curSong()); break;
     case 'line':
-      if (suppressLineClick) { suppressLineClick = false; break; }
+      if (lyrLp.suppress) { lyrLp.suppress = false; break; }
       var s = curSong(); if (!s) break;
       if (state.sync) { state.sync.idx = i; markTarget(); break; }
       if (state.adjust) {
@@ -1152,6 +1406,10 @@ $('#pEdit').onclick = function(){
   actionSheet('Letra de “' + s.title + '”', [
     { label: s.lyrics.length ? 'Editar letra' : 'Adicionar letra', fn:function(){ lyricsEditor(s); } }
   ].concat(timedIdx(s).length ? [{ label:'Ajustar tempos (±1s, ±5s, ±10s)', fn:startAdjust }] : [])
+   .concat(hasChords(s) ? [
+     { label:'Tom: transpor' + (s.transpose ? ' (' + (s.transpose > 0 ? '+' : '−') + Math.abs(s.transpose) + ')' : ''), fn:function(){ transposeSheet(s); } },
+     { label: chordsOn() ? 'Esconder cifras' : 'Mostrar cifras', fn:toggleChords }
+   ] : [])
    .concat([{ label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }]));
 };
 $('#pNotes').onclick = function(){ if (curSong()) notesEditor(curSong()); };
@@ -1168,11 +1426,11 @@ $('#bRate').onclick = function(){
 $('#bRepeat').onclick = repeatMenu;
 $('#bLoop').onclick = function(){
   if (!audio.src) return;
-  if (state.loopA == null) { state.loopA = audio.currentTime; toast('Início marcado em ' + fmt(state.loopA) + '. Toque de novo no fim do trecho'); }
+  if (state.loopA == null) { state.loopPart = null; state.loopA = audio.currentTime; toast('Início marcado em ' + fmt(state.loopA) + '. Toque de novo no fim do trecho'); }
   else if (state.loopB == null) {
     if (audio.currentTime <= state.loopA + 0.5) { toast('O fim precisa vir depois do início (' + fmt(state.loopA) + ')'); return; }
     state.loopB = audio.currentTime; audio.currentTime = state.loopA; toast('Repetindo ' + fmt(state.loopA) + ' a ' + fmt(state.loopB));
-  } else { state.loopA = state.loopB = null; toast('Repetição desligada'); }
+  } else { state.loopA = state.loopB = null; state.loopPart = null; toast('Repetição desligada'); }
   renderTools();
 };
 $('#bSync').onclick = function(){
@@ -1203,26 +1461,39 @@ $('#bSize').onclick = function(){
   if (lastActive >= 0) setTimeout(function(){ centerLine(lastActive, true); }, 30);
 };
 ['touchstart','wheel','pointerdown'].forEach(function(ev){ $('#lyrics').addEventListener(ev, function(){ userScrollAt = Date.now(); }, {passive:true}); });
-/* Segurar um verso abre a edição do verso (texto e anotação; o tempo não muda) */
-var lpTimer = null, lpStart = null, suppressLineClick = false;
-$('#lyrics').addEventListener('pointerdown', function(e){
-  suppressLineClick = false;
-  var el = e.target.closest('.line'); if (!el) return;
-  lpStart = { x:e.clientX, y:e.clientY };
-  clearTimeout(lpTimer);
-  lpTimer = setTimeout(function(){
-    lpTimer = null; suppressLineClick = true;
-    try { if (navigator.vibrate) navigator.vibrate(15); } catch(_){}
-    var s = curSong(); if (s) lineEditor(s, +el.dataset.i);
-  }, 550);
-});
-function cancelLp(e){
-  if (!lpTimer) return;
-  if (e.type === 'pointermove' && lpStart && Math.abs(e.clientX - lpStart.x) < 10 && Math.abs(e.clientY - lpStart.y) < 10) return;
-  clearTimeout(lpTimer); lpTimer = null;
+/* Segurar (meio segundo, sem arrastar): usado nos versos e nas partes */
+function longPress(box, sel, fn){
+  var st = { timer:null, start:null, suppress:false };
+  box.addEventListener('pointerdown', function(e){
+    st.suppress = false;
+    var el = e.target.closest(sel); if (!el) return;
+    st.start = { x:e.clientX, y:e.clientY };
+    clearTimeout(st.timer);
+    st.timer = setTimeout(function(){
+      st.timer = null; st.suppress = true;
+      try { if (navigator.vibrate) navigator.vibrate(15); } catch(_){}
+      fn(el);
+    }, 550);
+  });
+  function cancel(e){
+    if (!st.timer) return;
+    if (e.type === 'pointermove' && st.start && Math.abs(e.clientX - st.start.x) < 10 && Math.abs(e.clientY - st.start.y) < 10) return;
+    clearTimeout(st.timer); st.timer = null;
+  }
+  ['pointerup','pointercancel','pointerleave','pointermove'].forEach(function(ev){ box.addEventListener(ev, cancel, {passive:true}); });
+  box.addEventListener('contextmenu', function(e){ if (e.target.closest(sel)) e.preventDefault(); });
+  return st;
 }
-['pointerup','pointercancel','pointerleave','pointermove'].forEach(function(ev){ $('#lyrics').addEventListener(ev, cancelLp, {passive:true}); });
-$('#lyrics').addEventListener('contextmenu', function(e){ if (e.target.closest('.line')) e.preventDefault(); });
+/* Segurar um verso abre a edição do verso (texto, acordes e anotação; o tempo não muda) */
+var lyrLp = longPress($('#lyrics'), '.line', function(el){ var s = curSong(); if (s) lineEditor(s, +el.dataset.i); });
+/* Partes: tocar pula, segurar abre o menu da parte */
+var partLp = longPress($('#parts'), '.part-chip[data-k]', function(el){ partMenu(+el.dataset.k); });
+$('#parts').addEventListener('click', function(e){
+  if (partLp.suppress) { partLp.suppress = false; return; }
+  var b = e.target.closest('.part-chip'); if (!b) return;
+  if (b.dataset.add) addPart(); else jumpPart(+b.dataset.k);
+});
+['pointerdown','touchstart','wheel'].forEach(function(ev){ $('#parts').addEventListener(ev, function(){ partsTouchAt = Date.now(); }, {passive:true}); });
 
 var seek = $('#seek');
 seek.addEventListener('input', function(){ seeking = true; $('#tCur').textContent = fmt(seek.value / 1000 * (audio.duration || 0)); });
@@ -1240,6 +1511,8 @@ audio.addEventListener('loadedmetadata', function(){
 audio.addEventListener('ended', function(){
   if (state.sync) finishSync();
   if (state.adjust) { setPlayIcons(); return; }
+  /* Trecho repetindo até o fim da música (ex.: a última parte): volta ao início do trecho */
+  if (state.loopA != null && state.loopB != null) { audio.currentTime = state.loopA; lastActive = -2; audio.play().catch(function(){}); return; }
   if (repeatMode === 'one') { restartSong(); audio.play().catch(function(){}); return; }
   if (repeatMode === 'stop') { restartSong(); setPlayIcons(); return; }
   if (state.qi < state.queue.length - 1) playAt(state.qi + 1);

@@ -41,8 +41,10 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
     <li><a href="#menu">Menu de cada música</a></li>
     <li><a href="#playlists">Playlists</a></li>
     <li><a href="#tocar">Tocar e o player</a></li>
+    <li><a href="#partes">Partes da música</a></li>
     <li><a href="#observacoes">Observações da música</a></li>
     <li><a href="#letra">Colocar a letra</a></li>
+    <li><a href="#cifras">Cifras e tom</a></li>
     <li><a href="#sincronizar">Sincronizar a letra</a></li>
     <li><a href="#ajustar">Ajustar tempos</a></li>
     <li><a href="#verso">Corrigir um verso e anotar</a></li>
@@ -55,7 +57,6 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </ol>
 </nav>
 
-<!-- 1 -->
 <section class="tut-sec" id="comecar">
   <h2><span class="n">1</span>Adicionar músicas</h2>
   <div class="step">
@@ -86,7 +87,6 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 2 -->
 <section class="tut-sec" id="lista">
   <h2><span class="n">2</span>Buscar e navegar na lista</h2>
   <div class="step">
@@ -109,7 +109,6 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 3 -->
 <section class="tut-sec" id="menu">
   <h2><span class="n">3</span>Menu de cada música</h2>
   <div class="step">
@@ -128,7 +127,6 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 4 -->
 <section class="tut-sec" id="playlists">
   <h2><span class="n">4</span>Playlists</h2>
   <div class="step">
@@ -164,7 +162,6 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 5 -->
 <section class="tut-sec" id="tocar">
   <h2><span class="n">5</span>Tocar e o player</h2>
   <div class="step">
@@ -181,7 +178,8 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
       <h3>O player</h3>
       <ul>
         <li><b>Seta no alto à esquerda:</b> fecha o player sem parar a música.</li>
-        <li><b>Letra</b> (alto à direita): editar, ajustar tempos ou exportar a letra.</li>
+        <li><b>Letra</b> (alto à direita): editar, ajustar tempos, transpor, esconder as cifras ou exportar a letra.</li>
+        <li><b>Partes</b> (acima da barra de posição): pule direto para o verso, o refrão… Veja <a href="#partes">Partes da música</a>.</li>
         <li><b>Letra rolando:</b> o verso atual fica destacado e a tela acompanha. Tocar num verso pula a música para ele.</li>
         <li><b>Barra de posição:</b> arraste para ir a qualquer ponto.</li>
         <li><b>Anterior:</b> volta ao começo; nos 3 primeiros segundos, vai para a música anterior.</li>
@@ -193,9 +191,46 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 6 -->
+<section class="tut-sec" id="partes">
+  <h2><span class="n">6</span>Partes da música</h2>
+  <p class="sec-lead">Marque onde começa a Intro, o Verso, o Refrão… e vá direto para a parte que a banda quer repetir.</p>
+  <div class="step">
+    <figure class="phone"><img src="img/tutorial/31-partes.webp" width="780" height="1688" loading="lazy" alt="Fileira de partes acima da barra de posição, com o Refrão contornado"></figure>
+    <div class="txt">
+      <h3>Marcar as partes</h3>
+      <ol>
+        <li>Toque a música até o começo de uma parte.</li>
+        <li>Toque em <b>+ Parte</b>, no fim da fileira acima da barra de posição.</li>
+        <li>Escolha o nome: Intro, Verso, Pré-refrão, Refrão, Ponte, Solo, Final ou outro. Nome repetido vira “Verso 2”, “Refrão 2”.</li>
+      </ol>
+      <p><b>Tocar numa parte</b> leva a música para o começo dela. A parte que está tocando fica contornada, e a fileira rola sozinha para mostrá-la.</p>
+      <p>As partes também aparecem como traços na barra de posição e como rótulo (VERSO, REFRÃO) na letra sincronizada.</p>
+    </div>
+  </div>
+  <div class="step">
+    <figure class="phone"><img src="img/tutorial/32-menu-parte.webp" width="780" height="1688" loading="lazy" alt="Menu da parte Refrão com Repetir esta parte, Começa agora, Renomear e Apagar parte"></figure>
+    <div class="txt">
+      <h3>Segurar uma parte</h3>
+      <ul>
+        <li><b>Repetir esta parte:</b> repete do começo dela até o começo da próxima.</li>
+        <li><b>Começa agora:</b> marcou um pouco antes ou depois? Toque a música até o ponto certo e use esta opção.</li>
+        <li><b>Renomear</b> e <b>Apagar parte</b>.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="step">
+    <figure class="phone"><img src="img/tutorial/33-repetir-parte.webp" width="780" height="1688" loading="lazy" alt="Refrão repetindo, com o chip amarelo e o botão A–B ligado"></figure>
+    <div class="txt">
+      <h3>Repetindo uma parte</h3>
+      <p>A parte fica amarela, com o ícone de repetição, e o <b>A–B</b> fica ligado com o início e o fim dela. Dá para combinar com a velocidade.</p>
+      <p>Com uma parte repetindo, <b>tocar em outra parte passa a repetir a outra</b>: “agora a ponte” é um toque só.</p>
+      <p>Para parar, toque em <b>A–B ✓</b>.</p>
+    </div>
+  </div>
+</section>
+
 <section class="tut-sec" id="observacoes">
-  <h2><span class="n">6</span>Observações da música</h2>
+  <h2><span class="n">7</span>Observações da música</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/11-observacoes-faixa.webp" width="780" height="1688" loading="lazy" alt="Faixa de observações destacada abaixo do título no player"></figure>
     <div class="txt">
@@ -212,9 +247,8 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 7 -->
 <section class="tut-sec" id="letra">
-  <h2><span class="n">7</span>Colocar a letra</h2>
+  <h2><span class="n">8</span>Colocar a letra</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/13-menu-letra.webp" width="780" height="1688" loading="lazy" alt="Menu Letra do player"></figure>
     <div class="txt">
@@ -228,15 +262,44 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
         <li>Cole a letra com <b>um verso por linha</b>. Linhas em branco viram espaços entre as partes.</li>
         <li>Toque em <b>Salvar letra</b>.</li>
       </ol>
+      <p>Tem a cifra? Cole com os acordes; veja <a href="#cifras">Cifras e tom</a>.</p>
       <p>Tem um arquivo <b>.lrc</b> (letra com tempos)? Toque em <b>Importar .lrc</b> ou cole o conteúdo: a letra já fica sincronizada.</p>
       <p>Numa letra sincronizada, cada linha começa com o tempo entre colchetes, como <code>[00:12.40]</code>. Para corrigir uma palavra sem mexer nos tempos, é mais fácil <a href="#verso">segurar o verso no player</a>.</p>
     </div>
   </div>
 </section>
 
-<!-- 8 -->
+<section class="tut-sec" id="cifras">
+  <h2><span class="n">9</span>Cifras e tom</h2>
+  <div class="step">
+    <figure class="phone"><img src="img/tutorial/34-cifras.webp" width="780" height="1688" loading="lazy" alt="Letra com os acordes em cima das sílabas e o verso atual destacado"></figure>
+    <div class="txt">
+      <h3>Acordes em cima da letra</h3>
+      <p>Os acordes aparecem em cima da sílaba e acompanham a letra sincronizada. No verso que está tocando, eles ficam mais escuros, para ler rápido.</p>
+      <p>Para colocar, cole a cifra no editor de letra em um destes formatos:</p>
+      <ul>
+        <li><b>Acordes entre colchetes</b>, antes da sílaba: <code>[D]Na estrada de [G]terra</code>. Funciona junto com os tempos .lrc.</li>
+        <li><b>Como nos sites de cifra:</b> uma linha só de acordes em cima do verso. O Ensaio junta cada acorde com a sílaba embaixo dele.</li>
+      </ul>
+      <p>Uma linha só de acordes, sem verso, aparece como trecho instrumental. Para corrigir um acorde, <a href="#verso">segure o verso</a>.</p>
+    </div>
+  </div>
+  <div class="step">
+    <figure class="phone"><img src="img/tutorial/35-transpor.webp" width="780" height="1688" loading="lazy" alt="Janela Tom com os botões menos 1, Tom original e mais 1"></figure>
+    <div class="txt">
+      <h3>Transpor e esconder</h3>
+      <ul>
+        <li><b>Letra → Tom: transpor:</b> <b>−1</b> e <b>+1</b> descem e sobem meio tom; a janela mostra o tom original e o atual. Vale só para esta música e fica guardado.</li>
+        <li><b>Tom original</b> volta tudo como era.</li>
+        <li><b>Letra → Esconder cifras</b>, para quem só canta. Vale para todas as músicas deste aparelho.</li>
+      </ul>
+      <p class="tip">Transpor muda só os acordes mostrados. O áudio continua no tom em que foi gravado.</p>
+    </div>
+  </div>
+</section>
+
 <section class="tut-sec" id="sincronizar">
-  <h2><span class="n">8</span>Sincronizar a letra</h2>
+  <h2><span class="n">10</span>Sincronizar a letra</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/16-sincronizar.webp" width="780" height="1688" loading="lazy" alt="Modo sincronizar com o botão Marcar linha destacado"></figure>
     <div class="txt">
@@ -262,9 +325,8 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 9 -->
 <section class="tut-sec" id="ajustar">
-  <h2><span class="n">9</span>Ajustar tempos</h2>
+  <h2><span class="n">11</span>Ajustar tempos</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/17-ajustar.webp" width="780" height="1688" loading="lazy" alt="Barra de ajuste com os botões de menos 10 a mais 10 segundos destacados"></figure>
     <div class="txt">
@@ -282,15 +344,14 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 10 -->
 <section class="tut-sec" id="verso">
-  <h2><span class="n">10</span>Corrigir um verso e anotar</h2>
+  <h2><span class="n">12</span>Corrigir um verso e anotar</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/18-editar-verso.webp" width="780" height="1688" loading="lazy" alt="Janela Editar verso com o texto e a anotação"></figure>
     <div class="txt">
       <p>No player, <b>segure o dedo sobre um verso</b> por meio segundo, sem arrastar. Abre a janela <b>Editar verso</b>:</p>
       <ul>
-        <li><b>Texto do verso:</b> corrija uma palavra sem abrir a letra toda. O tempo do verso continua o mesmo.</li>
+        <li><b>Texto do verso:</b> corrija uma palavra sem abrir a letra toda. Se o verso tem acordes, eles aparecem entre colchetes, como <code>[G]Ê, estrada</code>: mude, apague ou acrescente. O tempo do verso continua o mesmo.</li>
         <li><b>Anotação:</b> um lembrete preso a esse verso, como “entra a segunda voz”, até 200 caracteres. Aparece embaixo do verso, com um traço amarelo (veja na imagem do player).</li>
         <li><b>Apagar:</b> remove o verso (pede confirmação). Os outros versos mantêm seus tempos.</li>
       </ul>
@@ -299,9 +360,8 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 11 -->
 <section class="tut-sec" id="ferramentas">
-  <h2><span class="n">11</span>Ferramentas de ensaio</h2>
+  <h2><span class="n">13</span>Ferramentas de ensaio</h2>
   <p class="sec-lead">A fileira de botões no rodapé do player: <b>velocidade</b>, <b>A–B</b>, <b>ao terminar</b>, <b>Sincronizar</b> e <b>Aa</b>.</p>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/19-velocidade.webp" width="780" height="1688" loading="lazy" alt="Menu de velocidade de 0,5 a 1,25 vezes"></figure>
@@ -347,9 +407,8 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 12 -->
 <section class="tut-sec" id="lrc">
-  <h2><span class="n">12</span>Exportar a letra (.lrc)</h2>
+  <h2><span class="n">14</span>Exportar a letra (.lrc)</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/23-exportar-lrc.webp" width="780" height="1688" loading="lazy" alt="Janela Exportar letra com o conteúdo do arquivo .lrc"></figure>
     <div class="txt">
@@ -359,14 +418,13 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
         <li><b>Baixar arquivo:</b> quando aparece, salva como <code>.lrc.txt</code>; renomeie tirando o “.txt”.</li>
         <li><b>Copiar texto:</b> copia o conteúdo.</li>
       </ul>
-      <p>O .lrc abre em outros players com letra sincronizada. Observações e anotações não vão nele; para levá-las, use <a href="#backup">Exportar dados</a>.</p>
+      <p>O .lrc abre em outros players com letra sincronizada. Acordes, observações e anotações não vão nele; para levá-las, use <a href="#backup">Exportar dados</a>.</p>
     </div>
   </div>
 </section>
 
-<!-- 13 -->
 <section class="tut-sec" id="tema">
-  <h2><span class="n">13</span>Tema claro ou escuro</h2>
+  <h2><span class="n">15</span>Tema claro ou escuro</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/25-tema.webp" width="780" height="1688" loading="lazy" alt="Menu Tema com Automático, Claro e Escuro"></figure>
     <div class="txt">
@@ -386,15 +444,14 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 14 -->
 <section class="tut-sec" id="backup">
-  <h2><span class="n">14</span>Backup e troca de celular</h2>
+  <h2><span class="n">16</span>Backup e troca de celular</h2>
   <p class="sec-lead">Tudo fica só no navegador deste celular. <b>Limpar os dados do navegador apaga tudo</b>, então faça um backup de vez em quando.</p>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/26-exportar-dados.webp" width="780" height="1688" loading="lazy" alt="Janela Exportar dados com o resumo do arquivo"></figure>
     <div class="txt">
       <h3>Exportar dados</h3>
-      <p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as observações, as anotações e as playlists.</p>
+      <p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as cifras e o tom, as partes, as observações, as anotações e as playlists.</p>
       <p><b>Os áudios não vão junto</b>, para o arquivo continuar leve. Guarde no Drive ou mande para você mesmo por mensagem ou e-mail.</p>
     </div>
   </div>
@@ -420,9 +477,8 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 15 -->
 <section class="tut-sec" id="instalar">
-  <h2><span class="n">15</span>Instalar e atualizar</h2>
+  <h2><span class="n">17</span>Instalar e atualizar</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/29-instalar.webp" width="780" height="1688" loading="lazy" alt="Ajuda com a seção Instalar no celular e o botão Instalar o app"></figure>
     <div class="txt">
@@ -444,15 +500,15 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
-<!-- 16 -->
 <section class="tut-sec" id="roteiro">
-  <h2><span class="n">16</span>Roteiro de um ensaio</h2>
+  <h2><span class="n">18</span>Roteiro de um ensaio</h2>
   <div class="cards">
     <div class="card">
       <h3>Antes</h3>
       <ul>
         <li>Adicione os áudios e cole as letras.</li>
-        <li>Sincronize as músicas novas e anote tom e capotraste nas observações.</li>
+        <li>Sincronize as músicas novas, cole as cifras e anote tom e capotraste nas observações.</li>
+        <li>Marque as partes (Intro, Verso, Refrão…).</li>
         <li>Monte a playlist na ordem do ensaio.</li>
         <li>Faça um <b>Exportar dados</b> para garantir.</li>
       </ul>
@@ -460,7 +516,7 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
     <div class="card">
       <h3>Estudando sozinho</h3>
       <ul>
-        <li>Marque o trecho difícil com <b>A–B</b>.</li>
+        <li>Segure a parte difícil e escolha <b>Repetir esta parte</b> (ou marque um trecho com <b>A–B</b>).</li>
         <li>Baixe para 0,75× e vá subindo até 1×.</li>
         <li>Use <b>Repetir esta música</b> para passar várias vezes sem tocar no celular.</li>
         <li>Segure os versos para anotar entradas e respirações.</li>
@@ -471,7 +527,8 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
       <ul>
         <li>Tema escuro e letra grande (<b>Aa</b>) para ler de longe.</li>
         <li><b>Pausar ao fim da música</b> para conversar entre uma e outra.</li>
-        <li>Toque num verso para voltar direto àquela parte.</li>
+        <li>“Do refrão!”: toque na parte, ou num verso, para ir direto.</li>
+        <li>Mudou o tom? <b>Tom: transpor</b> e a cifra acompanha.</li>
         <li>Com o player aberto, a tela não apaga.</li>
       </ul>
     </div>

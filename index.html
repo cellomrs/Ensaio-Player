@@ -45,7 +45,9 @@
     <button id="pNotes" class="notes" hidden aria-label="Observações da música"></button>
     <div id="lyrics" class="lyrics" data-size="m"></div>
     <div class="p-bottom">
+      <div class="parts" id="parts" role="group" aria-label="Partes da música"></div>
       <div class="seek-wrap">
+        <div class="pmarks" id="partMarks"></div>
         <input id="seek" type="range" min="0" max="1000" step="1" value="0" aria-label="Posição na música">
         <span id="mkA" class="mk" hidden></span><span id="mkB" class="mk" hidden></span>
       </div>
@@ -157,6 +159,20 @@
 <p>Ao terminar uma música, a próxima começa sozinha (dá para mudar no ícone ao lado do A–B; veja Ferramentas de ensaio). Com o player aberto e a música tocando, a tela fica acesa. Os controles também aparecem na tela de bloqueio da maioria dos celulares.</p>
 </div></details>
 
+<details><summary>Partes da música</summary><div class="body">
+<p>Marque onde começa cada parte (Intro, Verso, Refrão, Ponte, Solo…) para ir direto a ela e repetir a parte inteira, sem procurar na barra.</p>
+<ol>
+<li>No player, toque a música até o começo da parte e toque em <b>+ Parte</b>, logo acima da barra de posição.</li>
+<li>Escolha o nome. Se o nome já existe, vira “Verso 2”, “Refrão 2” e assim por diante.</li>
+</ol>
+<ul>
+<li><b>Tocar numa parte:</b> a música vai para o começo dela. A parte em que a música está fica contornada.</li>
+<li><b>Segurar uma parte</b> (meio segundo): <b>Repetir esta parte</b>, <b>Começa agora</b> (muda o início para o tempo atual), <b>Renomear</b> ou <b>Apagar parte</b>.</li>
+<li><b>Repetindo:</b> a parte fica amarela, com o ícone de repetição, e o <b>A–B</b> fica ligado. Tocar em outra parte passa a repetir a outra. Toque em <b>A–B ✓</b> para desligar.</li>
+</ul>
+<p>As partes aparecem como traços na barra de posição e, com a letra sincronizada, como um rótulo (VERSO, REFRÃO) antes do primeiro verso de cada uma.</p>
+</div></details>
+
 <details><summary>Letras e sincronização</summary><div class="body">
 <p>Com a letra sincronizada, o verso atual fica destacado e a tela rola sozinha. Tocar num verso pula a música para ele.</p>
 <h3>Adicionar a letra</h3>
@@ -189,6 +205,24 @@
 <p>Em <b>Este verso</b>, o tempo não passa do verso anterior nem do seguinte, para a ordem não embaralhar.</p>
 <h3>Importar .lrc</h3>
 <p>No editor de letra, toque em <b>Importar .lrc</b> ou cole o conteúdo do arquivo. A letra já fica sincronizada. Dá para ajustar tempos à mão: cada linha começa com o tempo entre colchetes, como <code>[01:23.40]</code>.</p>
+</div></details>
+
+<details><summary>Cifras e tom</summary><div class="body">
+<p>Os acordes aparecem em cima da sílaba, acompanhando a letra sincronizada.</p>
+<h3>Colocar a cifra</h3>
+<p>No editor de letra (<b>Letra → Editar letra</b>), cole a cifra num destes formatos:</p>
+<ul>
+<li><b>Acordes entre colchetes</b>, antes da sílaba: <code>[D]Na estrada de [G]terra</code>. Funciona junto com os tempos: <code>[00:12.40][D]Na estrada</code>.</li>
+<li><b>Como nos sites de cifra:</b> uma linha só de acordes em cima do verso. O Ensaio junta cada acorde com a sílaba que está embaixo dele.</li>
+</ul>
+<p>Uma linha só de acordes, sem verso embaixo, aparece como trecho instrumental.</p>
+<h3>Corrigir um acorde</h3>
+<p>Segure o verso: no campo <b>Texto do verso</b>, os acordes aparecem entre colchetes. Mude, apague ou acrescente, como <code>[Em]</code>, e salve. O tempo do verso não muda.</p>
+<h3>Transpor e esconder</h3>
+<ul>
+<li><b>Letra → Tom: transpor:</b> sobe ou desce os acordes de meio em meio tom. Vale só para esta música e fica guardado. O áudio continua no tom gravado.</li>
+<li><b>Letra → Esconder cifras / Mostrar cifras:</b> para quem só canta. Vale para todas as músicas deste aparelho.</li>
+</ul>
 </div></details>
 
 <details><summary>Ferramentas de ensaio</summary><div class="body">
@@ -231,7 +265,7 @@
 <li><b>Baixar arquivo:</b> salva como <code>.lrc.txt</code>; renomeie tirando o “.txt”.</li>
 <li><b>Copiar texto:</b> copia o conteúdo.</li>
 </ul>
-<p>Observações e anotações não vão no arquivo, porque o formato .lrc não tem lugar para elas.</p>
+<p>Acordes, observações e anotações não vão no arquivo, porque o formato .lrc não tem lugar para eles. Para levar tudo, use <b>Exportar dados</b>.</p>
 </div></details>
 
 <details><summary>Onde ficam seus dados</summary><div class="body">
@@ -242,7 +276,7 @@
 <li><b>O Ensaio guarda até 1 GB de áudio</b>, o que dá umas 100 a 200 músicas em MP3. Cada música ocupa o tamanho do arquivo original. No fim da aba <b>Músicas</b> aparece quanto já foi usado e quanto falta. Quando enche, exclua músicas que saíram do repertório; as letras podem ser guardadas antes com <b>Exportar dados</b>.</li>
 </ul>
 <h3>Exportar dados (backup)</h3>
-<p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as observações, as anotações nos versos e as playlists. <b>Os áudios não vão junto</b>, para o arquivo continuar leve. Guarde no Drive, mande para você mesmo por mensagem ou e-mail.</p>
+<p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as cifras e o tom, as partes, as observações, as anotações nos versos e as playlists. <b>Os áudios não vão junto</b>, para o arquivo continuar leve. Guarde no Drive, mande para você mesmo por mensagem ou e-mail.</p>
 <h3>Importar dados</h3>
 <ol>
 <li>No outro celular (ou depois de limpar o navegador), toque em <b>Importar dados</b> e escolha o arquivo.</li>
@@ -268,6 +302,8 @@
 <p>Use <b>Sincronizar → Ajustar tempos</b> e empurre o verso com os botões ±1s, ±5s ou ±10s. Se a letra toda está adiantada ou atrasada igual, escolha <b>Letra toda</b>.</p>
 <h3>A tela apaga durante o ensaio</h3>
 <p>Mantenha o player aberto com a música tocando. Se ainda apagar, aumente o tempo de bloqueio nas configurações do celular.</p>
+<h3>Os acordes ficaram na sílaba errada</h3>
+<p>No formato dos sites de cifra, a posição vem dos espaços da linha de acordes. Se o site usava outra fonte, eles podem sair deslocados. Segure o verso e mova o acorde entre colchetes para antes da sílaba certa.</p>
 <h3>Segurar o verso não abre a edição</h3>
 <p>Segure o dedo parado, sem arrastar, por cerca de meio segundo.</p>
 <h3>Não aparece “Compartilhar .lrc”</h3>

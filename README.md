@@ -22,11 +22,13 @@ Toque num verso para pular para ele
 Sincronização manual: dê play e toque em Marcar linha no começo de cada verso
 Ajuste fino dos tempos sem digitar: escolha um verso e use os botões −10 s, −5 s, −1 s, +1 s, +5 s e +10 s para ele acender antes ou depois. Dá para ajustar só esse verso, ele e todos os seguintes, ou a letra toda. A cada toque a música volta 2 s antes do verso para você conferir, e Cancelar desfaz tudo
 Importação e exportação de arquivos .lrc
+Cifras sobre a letra: cole os acordes entre colchetes ([D]Na estrada) ou no formato dos sites de cifra (acordes na linha de cima). Transposição por música, de meio em meio tom, e opção de esconder as cifras para quem só canta
 
 Ferramentas de ensaio
 
 Velocidade de 0,5× a 1,25× sem mudar o tom
 Repetição de trecho (A–B)
+Partes da música (Intro, Verso, Refrão…): marque onde cada uma começa, toque para ir direto a ela e segure para repetir a parte inteira
 Botões de −5 s e +5 s
 Três tamanhos de letra, para ler de longe na estante
 Tema claro, escuro ou automático (segue o celular), escolhido no ícone do cabeçalho
@@ -40,7 +42,7 @@ Anotações presas a um verso, como “entra a segunda voz”
 
 Backup e troca de celular
 
-Exportar dados: um arquivo .json pequeno com letras e tempos, observações, anotações nos versos e playlists (os áudios não vão junto, para o arquivo continuar leve)
+Exportar dados: um arquivo .json pequeno com letras e tempos, cifras e tom, partes, observações, anotações nos versos e playlists (os áudios não vão junto, para o arquivo continuar leve)
 Importar dados: antes de mudar algo, mostra o que vai acontecer. Músicas com o mesmo nome recebem a letra do arquivo; as que ainda não estão no aparelho ficam “esperando o áudio” e a letra entra sozinha quando você adiciona um áudio com o mesmo nome, inclusive na posição certa da playlist
 
 App instalável (PWA)
@@ -128,7 +130,7 @@ Cada linha sincronizada começa com o tempo entre colchetes:
 [00:12.40]Primeiro verso da letra
 [00:17.85]Segundo verso da letra
 
-Observações e anotações não entram no .lrc, porque o formato não tem lugar para elas. Para levá-las junto, use Exportar dados.
+Acordes, observações e anotações não entram no .lrc, porque o formato não tem lugar para eles. Para levá-los junto, use Exportar dados.
 
 Arquivo de dados (.json)
 
@@ -138,10 +140,15 @@ Arquivo de dados (.json)
  "exportedAt": "2026-11-12T10:00:00.000Z",
  "songs": [
   { "title": "Nome da música", "notes": "Tom de Ré", "duration": 212.4,
-    "lyrics": [ { "text": "Primeiro verso", "t": 12.4, "note": "entra a segunda voz" } ] }
+    "transpose": 2,
+    "parts": [ { "t": 0, "name": "Intro" }, { "t": 12.4, "name": "Verso" }, { "t": 33.2, "name": "Refrão" } ],
+    "lyrics": [ { "text": "Primeiro verso", "t": 12.4, "note": "entra a segunda voz",
+                  "chords": [ { "i": 0, "c": "D" }, { "i": 9, "c": "G" } ] } ] }
  ],
  "playlists": [ { "name": "Ensaio de sábado", "songs": ["Nome da música"] } ]
 }
 ```
 
 Na importação, as músicas são ligadas pelo título, sem diferença de maiúsculas, acentos e “_”.
+
+Os acordes ficam à parte do texto (chords: i é a posição do caractere no verso, c é o acorde), então a busca, o .lrc e a sincronização não são afetados. transpose são os semitons escolhidos para a música (−11 a 11). parts, chords e transpose são opcionais: arquivos exportados antes desta versão continuam importando.
