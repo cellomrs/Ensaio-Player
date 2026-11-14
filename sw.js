@@ -6,7 +6,7 @@
  * As músicas, letras e playlists NÃO passam por aqui: ficam no IndexedDB e não são afetadas
  * pela troca de versão.
  */
-var VERSION = 'ensaio-v2';
+var VERSION = 'ensaio-v2.1';
 var FONTS = 'ensaio-fontes';
 
 var SHELL = [
