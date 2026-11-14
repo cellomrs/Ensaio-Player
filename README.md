@@ -35,6 +35,7 @@ Tela acesa enquanto a música toca
 Anotações
 
 Observações gerais por música (tom, capotraste, estrutura)
+Segure um verso no player para corrigir o texto ou pôr uma anotação, sem perder o tempo dele nem abrir a letra toda
 Anotações presas a um verso, como “entra a segunda voz”
 
 Backup e troca de celular

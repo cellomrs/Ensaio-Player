@@ -725,21 +725,40 @@ function carryNotes(oldL, newL){
   });
   return pool.length;
 }
-function lineNoteEditor(s, i){
+function cleanVerse(v){ return String(v || '').replace(/[\r\n]+/g, ' ').replace(/^\s*(\[[^\]]*\]\s*)+/, '').trim(); }
+function lineEditor(s, i){
   var l = s.lyrics[i]; if (!l) return;
-  modal('<h2>Anotação na linha</h2><p>“' + esc(l.text) + '”</p>' +
-    '<textarea class="field notes-ta" id="lnTxt" maxlength="200" placeholder="Ex.: entra a segunda voz"></textarea>' +
-    '<div class="m-actions">' + (l.note ? '<button class="btn ghost" data-m="del">Apagar</button><span class="grow"></span>' : '') +
-    '<button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar anotação</button></div>');
-  $('#lnTxt').value = l.note || '';
+  modal('<h2>Editar verso</h2>' +
+    (l.t != null ? '<p class="small">Começa em ' + fmt(l.t) + '. O tempo continua o mesmo.</p>' : '') +
+    '<label class="m-lbl" for="lvTxt">Texto do verso</label>' +
+    '<input class="field" id="lvTxt" maxlength="300" autocomplete="off">' +
+    '<label class="m-lbl" for="lnTxt">Anotação <span>(opcional)</span></label>' +
+    '<textarea class="field notes-ta ln-ta" id="lnTxt" maxlength="200" placeholder="Ex.: entra a segunda voz"></textarea>' +
+    '<div class="m-actions"><button class="btn ghost" data-m="del" aria-label="Apagar verso">Apagar</button><span class="grow"></span>' +
+    '<button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>');
+  $('#lvTxt').value = l.text; $('#lnTxt').value = l.note || '';
   $('#sheet').onclick = async function(e){
     var b = e.target.closest('[data-m]'); if (!b) return;
-    if (b.dataset.m === 'x') { closeModal(); return; }
-    var v = b.dataset.m === 'ok' ? $('#lnTxt').value.trim() : '';
-    if (v) l.note = v; else delete l.note;
-    closeModal();
-    try { await save('songs', s); toast(v ? 'Anotação salva' : 'Anotação apagada'); } catch(err){ toast('Não foi possível salvar a anotação'); }
-    if (curSong() === s) renderLyrics();
+    var m = b.dataset.m;
+    if (m === 'x') { closeModal(); return; }
+    if (m === 'ok') {
+      var text = cleanVerse($('#lvTxt').value), note = $('#lnTxt').value.trim();
+      if (!text) { toast('Escreva o verso ou use Apagar'); $('#lvTxt').focus(); return; }
+      l.text = text; if (note) l.note = note; else delete l.note;
+      closeModal();
+      try { await save('songs', s); toast('Verso salvo'); } catch(err){ toast('Não foi possível salvar o verso'); }
+    } else if (m === 'del') {
+      closeModal();
+      if (!(await confirmBox('Apagar este verso?', 'Apagar'))) return;
+      if (s.lyrics[i] !== l) return;
+      if (curSong() === s) { if (state.sync) finishSync(); if (state.adjust) finishAdjust(); }
+      s.lyrics.splice(i, 1);
+      var prevGap = i > 0 && !s.lyrics[i-1].text.trim(), nextGap = i < s.lyrics.length && !s.lyrics[i].text.trim();
+      if (nextGap && (prevGap || i === 0)) s.lyrics.splice(i, 1);
+      else if (prevGap && i === s.lyrics.length) s.lyrics.splice(i - 1, 1);
+      try { await save('songs', s); toast('Verso apagado'); } catch(err){ toast('Não foi possível apagar o verso'); }
+    }
+    if (curSong() === s) { renderLyrics(); updateActive(); }
     renderView();
   };
 }
@@ -1183,7 +1202,7 @@ $('#bSize').onclick = function(){
   if (lastActive >= 0) setTimeout(function(){ centerLine(lastActive, true); }, 30);
 };
 ['touchstart','wheel','pointerdown'].forEach(function(ev){ $('#lyrics').addEventListener(ev, function(){ userScrollAt = Date.now(); }, {passive:true}); });
-/* Segurar uma linha abre a anotação */
+/* Segurar um verso abre a edição do verso (texto e anotação; o tempo não muda) */
 var lpTimer = null, lpStart = null, suppressLineClick = false;
 $('#lyrics').addEventListener('pointerdown', function(e){
   suppressLineClick = false;
@@ -1193,7 +1212,7 @@ $('#lyrics').addEventListener('pointerdown', function(e){
   lpTimer = setTimeout(function(){
     lpTimer = null; suppressLineClick = true;
     try { if (navigator.vibrate) navigator.vibrate(15); } catch(_){}
-    var s = curSong(); if (s) lineNoteEditor(s, +el.dataset.i);
+    var s = curSong(); if (s) lineEditor(s, +el.dataset.i);
   }, 550);
 });
 function cancelLp(e){
