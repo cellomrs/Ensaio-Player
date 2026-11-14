@@ -51,9 +51,10 @@ Aviso “Nova versão disponível” quando o app é atualizado (só recarrega q
 Ajuda
 
 Manual de uso completo dentro do próprio app
+Tutorial com imagens das telas (tutorial.html), aberto pela aba Ajuda sem parar a música
 Como usar
 
-Abra a página no navegador do celular e toque em Adicionar músicas. O manual completo está na aba Ajuda do app.
+Abra a página no navegador do celular e toque em Adicionar músicas. O manual completo está na aba Ajuda do app, e o tutorial com imagens fica no link do topo da Ajuda (ou direto em tutorial.html).
 
 Para corrigir um verso fora de tempo, abra o player, toque em Sincronizar e escolha Ajustar tempos (também tem esse item no menu Letra).
 
@@ -76,7 +77,9 @@ Publicar uma atualização
 
 O service worker (sw.js) guarda os arquivos do app no aparelho. Ao publicar qualquer mudança em index.html, css/, js/ ou img/, aumente a VERSION no início do sw.js (por exemplo de ensaio-v1 para ensaio-v2). Sem isso, quem já instalou continua vendo a versão antiga. Com isso, o app mostra “Nova versão disponível” e atualiza quando a pessoa tocar em Atualizar. As músicas e letras não são afetadas.
 
-Se acrescentar um arquivo novo ao app (outro .js, .css ou imagem), inclua-o também na lista SHELL do sw.js.
+Se acrescentar um arquivo novo ao app (outro .js, .css ou imagem), inclua-o também na lista SHELL do sw.js. As imagens de img/tutorial/ são a exceção: ficam guardadas quando a pessoa abre o tutorial.
+
+Se mudar uma tela do app, vale refazer o print correspondente em img/tutorial/ (390 × 844 px, escala 2, WebP).
 
 Onde ficam os dados
 
@@ -91,10 +94,12 @@ Estrutura do projeto
 
 ```text
 index.html
+tutorial.html          tutorial com imagens (abre por cima do app ou sozinho)
 manifest.webmanifest   dados do app instalável (nome, ícones, cores)
 sw.js                  service worker: funcionamento sem internet e atualizações
 css/
   styles.css
+  tutorial.css         estilo do tutorial (usa as cores de styles.css)
 js/
   app.js
 img/
@@ -104,6 +109,7 @@ img/
   icon-maskable-192.png, icon-maskable-512.png ícones com margem para o recorte do Android
   apple-touch-icon.png  ícone do iPhone/iPad
   favicon-32.png        ícone da aba do navegador
+  tutorial/             prints do tutorial (WebP, guardados pelo service worker quando vistos)
 ```
 
 Tecnologia

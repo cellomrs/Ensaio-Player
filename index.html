@@ -94,6 +94,7 @@
   </div>
 </section>
 
+<section id="tutorial" class="tut-overlay" hidden aria-label="Tutorial"><iframe id="tutFrame" title="Tutorial do Ensaio"></iframe></section>
 <div id="modal" class="modal" hidden><div id="sheet" class="sheet" role="dialog" aria-modal="true"></div></div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="updateBar" class="update-bar" role="status" hidden><span>Nova versão do Ensaio disponível.</span><button class="btn" id="updateBtn">Atualizar</button><button class="icon-btn small" id="updateLater" aria-label="Agora não"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></svg></button></div>
@@ -104,6 +105,7 @@
 <template id="helpTpl">
 <div class="help">
 <div class="help-brand"><img src="img/logo-96.png" alt="" width="56" height="56"><p class="lead">O Ensaio toca seus arquivos de áudio, mostra a letra acompanhando a música e ajuda a repetir e desacelerar trechos. Tudo fica guardado só neste celular.</p></div>
+<a class="tut-link" href="tutorial.html" data-act="tutorial"><span class="tut-link-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="2.5" width="12" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M10.5 9.5v5l4-2.5z" fill="currentColor"/></svg></span><span class="tut-link-txt"><b>Tutorial completo com imagens</b><span>Passo a passo com as telas do app, do primeiro áudio ao ensaio</span></span><span class="tut-link-go" aria-hidden="true">›</span></a>
 
 <details id="installHelp"><summary>Instalar no celular</summary><div class="body">
 <p>Instalado, o Ensaio ganha ícone na tela de início, abre em tela cheia e <b>funciona sem internet</b> (as músicas já ficam no aparelho).</p>
@@ -152,7 +154,7 @@
 <li><b>Próxima:</b> vai para a próxima da fila.</li>
 <li><b>Letra</b> (canto de cima): editar ou exportar a letra.</li>
 </ul>
-<p>Ao terminar uma música, a próxima começa sozinha. Com o player aberto e a música tocando, a tela fica acesa. Os controles também aparecem na tela de bloqueio da maioria dos celulares.</p>
+<p>Ao terminar uma música, a próxima começa sozinha (dá para mudar no ícone ao lado do A–B; veja Ferramentas de ensaio). Com o player aberto e a música tocando, a tela fica acesa. Os controles também aparecem na tela de bloqueio da maioria dos celulares.</p>
 </div></details>
 
 <details><summary>Letras e sincronização</summary><div class="body">

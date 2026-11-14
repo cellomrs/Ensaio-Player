@@ -6,7 +6,7 @@
  * As músicas, letras e playlists NÃO passam por aqui: ficam no IndexedDB e não são afetadas
  * pela troca de versão.
  */
-var VERSION = 'ensaio-v2.1';
+var VERSION = 'ensaio-v2.2';
 var FONTS = 'ensaio-fontes';
 
 var SHELL = [
@@ -15,6 +15,8 @@ var SHELL = [
   'css/styles.css',
   'js/app.js',
   'manifest.webmanifest',
+  'tutorial.html',
+  'css/tutorial.css',
   'img/logo-96.png',
   'img/favicon-32.png',
   'img/apple-touch-icon.png',
@@ -61,11 +63,23 @@ self.addEventListener('fetch', function(e){
 
   if (url.origin !== self.location.origin) return;
 
-  /* Abrir o app (navegação): sempre a página guardada, com ou sem internet */
+  /* Abrir uma página (navegação): a cópia guardada dela (tutorial.html, por exemplo);
+     para o endereço do app, sempre o index.html guardado, com ou sem internet */
   if (req.mode === 'navigate') {
-    e.respondWith(caches.match('index.html', { ignoreSearch: true }).then(function(hit){
-      return hit || fetch(req);
-    }).catch(function(){ return fetch(req); }));
+    e.respondWith(caches.match(req, { ignoreSearch: true }).then(function(hit){
+      if (hit) return hit;
+      return fetch(req).catch(function(){ return caches.match('index.html'); });
+    }).then(function(res){ return res || caches.match('index.html'); }));
+    return;
+  }
+
+  /* Imagens do tutorial: guardadas na primeira vez que aparecem, para não pesar a instalação */
+  if (url.pathname.indexOf('/img/tutorial/') >= 0) {
+    e.respondWith(caches.open(VERSION).then(function(c){
+      return c.match(req).then(function(hit){
+        return hit || fetch(req).then(function(res){ if (res.ok) c.put(req, res.clone()); return res; });
+      });
+    }));
     return;
   }
 

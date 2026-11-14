@@ -1099,6 +1099,7 @@ document.addEventListener('click', async function(e){
     case 'export': exportData(); break;
     case 'theme': themeMenu(); break;
     case 'install': doInstall(); break;
+    case 'tutorial': e.preventDefault(); openTutorial(); break;
     case 'import': $('#dataFile').value = ''; $('#dataFile').click(); break;
     case 'droppending':
       if (!(await confirmBox('Descartar as letras de ' + state.pending.length + (state.pending.length === 1 ? ' música que ainda não tem' : ' músicas que ainda não têm') + ' áudio aqui?', 'Descartar'))) break;
@@ -1246,6 +1247,26 @@ audio.addEventListener('ended', function(){
   else { restartSong(); setPlayIcons(); }
 });
 audio.addEventListener('error', function(){ if (audio.src) toast('Este formato de áudio não toca neste aparelho'); });
+
+/* ---------- Tutorial (tutorial.html por cima do app, para a música continuar) ---------- */
+function tutorialOpen(){ return !$('#tutorial').hidden; }
+function openTutorial(){
+  var f = $('#tutFrame');
+  if (!f.getAttribute('src')) f.setAttribute('src', 'tutorial.html');
+  else try { var r = f.contentDocument.documentElement, t = getTheme(); if (t === 'auto') r.removeAttribute('data-theme'); else r.setAttribute('data-theme', t); } catch(e){}
+  $('#tutorial').hidden = false;
+  try { history.pushState({ tutorial:true }, ''); } catch(e){}
+  try { f.focus(); } catch(e){}
+}
+function hideTutorial(){ $('#tutorial').hidden = true; }
+function closeTutorial(){
+  if (!tutorialOpen()) return;
+  hideTutorial();
+  if (history.state && history.state.tutorial) history.back();
+}
+window.addEventListener('popstate', function(){ if (tutorialOpen()) hideTutorial(); });
+window.addEventListener('message', function(e){ if (e.origin === location.origin && e.data === 'ensaio:fechar-tutorial') closeTutorial(); });
+document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && tutorialOpen() && $('#modal').hidden) closeTutorial(); });
 
 /* ---------- App instalável (PWA) ---------- */
 var installPrompt = null;
