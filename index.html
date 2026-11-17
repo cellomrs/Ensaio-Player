@@ -43,6 +43,7 @@
       <button class="text-btn" id="pEdit">Letra</button>
     </div>
     <button id="pNotes" class="notes" hidden aria-label="Observações da música"></button>
+    <button id="mkLegend" class="mk-legend" hidden aria-label="Legenda do marca-texto. Toque para mudar os nomes das cores"></button>
     <div id="lyrics" class="lyrics" data-size="m"></div>
     <div class="p-bottom">
       <div class="parts" id="parts" role="group" aria-label="Partes da música"></div>
@@ -258,6 +259,20 @@
 <p>Se você editar a letra, as anotações ficam nos versos que mantiverem o mesmo texto. As de versos alterados são removidas, com aviso.</p>
 </div></details>
 
+<details><summary>Marca-texto</summary><div class="body">
+<p>Pinte versos ou trechos com cores, como caneta marca-texto: quem canta cada parte, onde entra o coro, uma palavra para caprichar.</p>
+<ol>
+<li>No player, <b>segure o verso</b> por meio segundo.</li>
+<li>Para marcar só um trecho, selecione as palavras no campo <b>Texto do verso</b>. Sem seleção, a cor vale para o verso inteiro.</li>
+<li>Toque na cor. A prévia logo abaixo mostra como vai ficar.</li>
+<li>Toque em <b>Salvar</b>.</li>
+</ol>
+<p><b>Sem cor</b> tira a marcação do trecho selecionado ou do verso todo.</p>
+<h3>Nomes das cores e legenda</h3>
+<p>Em <b>Letra → Cores do marca-texto</b>, dê um nome a cada cor, como “Minha voz”, “2ª voz” ou “Coro”. Os nomes valem para todas as músicas e aparecem numa legenda pequena no alto do player (só as cores usadas na música). Tocar na legenda também abre os nomes.</p>
+<p>Se você mudar o texto do verso, a marcação acompanha as palavras que continuarem iguais.</p>
+</div></details>
+
 <details><summary>Exportar a letra</summary><div class="body">
 <p>Em <b>Letra</b> no player ou no menu <b>⋯</b>, toque em <b>Exportar letra (.lrc)</b>:</p>
 <ul>
@@ -265,7 +280,7 @@
 <li><b>Baixar arquivo:</b> salva como <code>.lrc.txt</code>; renomeie tirando o “.txt”.</li>
 <li><b>Copiar texto:</b> copia o conteúdo.</li>
 </ul>
-<p>Acordes, observações e anotações não vão no arquivo, porque o formato .lrc não tem lugar para eles. Para levar tudo, use <b>Exportar dados</b>.</p>
+<p>Acordes, marca-texto, observações e anotações não vão no arquivo, porque o formato .lrc não tem lugar para eles. Para levar tudo, use <b>Exportar dados</b>.</p>
 </div></details>
 
 <details><summary>Onde ficam seus dados</summary><div class="body">
@@ -276,7 +291,7 @@
 <li><b>O Ensaio guarda até 1 GB de áudio</b>, o que dá umas 100 a 200 músicas em MP3. Cada música ocupa o tamanho do arquivo original. No fim da aba <b>Músicas</b> aparece quanto já foi usado e quanto falta. Quando enche, exclua músicas que saíram do repertório; as letras podem ser guardadas antes com <b>Exportar dados</b>.</li>
 </ul>
 <h3>Exportar dados (backup)</h3>
-<p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as cifras e o tom, as partes, as observações, as anotações nos versos e as playlists. <b>Os áudios não vão junto</b>, para o arquivo continuar leve. Guarde no Drive, mande para você mesmo por mensagem ou e-mail.</p>
+<p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as cifras e o tom, as partes, o marca-texto e os nomes das cores, as observações, as anotações nos versos e as playlists. <b>Os áudios não vão junto</b>, para o arquivo continuar leve. Guarde no Drive, mande para você mesmo por mensagem ou e-mail.</p>
 <h3>Importar dados</h3>
 <ol>
 <li>No outro celular (ou depois de limpar o navegador), toque em <b>Importar dados</b> e escolha o arquivo.</li>

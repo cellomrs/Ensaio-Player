@@ -191,15 +191,99 @@ function songKey(s){
   }
   return null;
 }
+/* ---------- Marca-texto: trechos coloridos do verso ({ a, b, k }: início, fim no texto e cor) ---------- */
+var MARK_COLORS = { y:'Amarelo', g:'Verde', p:'Rosa', b:'Azul' };
+function markNames(){ try { var o = JSON.parse(localStorage.getItem('ensaio-marks') || '{}'); return o && typeof o === 'object' ? o : {}; } catch(e){ return {}; } }
+function setMarkNames(o){ try { localStorage.setItem('ensaio-marks', JSON.stringify(o)); } catch(e){} }
+function cleanMarkNames(o){
+  var out = {}; if (!o || typeof o !== 'object') return out;
+  Object.keys(MARK_COLORS).forEach(function(k){ if (typeof o[k] === 'string' && o[k].trim()) out[k] = o[k].trim().slice(0, 24); });
+  return out;
+}
+function markLabel(k){ return markNames()[k] || MARK_COLORS[k]; }
+/* Pinta [a, b) com a cor k (ou tira a cor, se k vazio) e devolve as marcas sem sobreposição */
+function paintMarks(marks, len, a, b, k){
+  var arr = [], i;
+  for (i = 0; i < len; i++) arr.push(null);
+  (marks || []).forEach(function(m){ if (!MARK_COLORS[m.k]) return; for (var j = Math.max(0, m.a); j < Math.min(len, m.b); j++) arr[j] = m.k; });
+  for (i = Math.max(0, a); i < Math.min(len, b); i++) arr[i] = k || null;
+  var out = [], cur = null;
+  for (i = 0; i < len; i++) {
+    if (!arr[i]) { cur = null; continue; }
+    if (cur && cur.k === arr[i] && cur.b === i) cur.b = i + 1;
+    else { cur = { a:i, b:i + 1, k:arr[i] }; out.push(cur); }
+  }
+  return out;
+}
+/* Texto mudou: mantém as marcas que ainda acham o mesmo trecho */
+function relocateMarks(oldText, newText, marks){
+  if (!marks || !marks.length) return [];
+  if (oldText === newText) return marks;
+  var out = [];
+  marks.forEach(function(m){
+    if (m.a === 0 && m.b >= oldText.length) { out = paintMarks(out, newText.length, 0, newText.length, m.k); return; }
+    var sub = oldText.slice(m.a, m.b), at = sub.trim() ? newText.indexOf(sub) : -1;
+    if (at >= 0) out = paintMarks(out, newText.length, at, at + sub.length, m.k);
+  });
+  return out;
+}
+function markedHtml(text, marks, from, to){
+  if (from == null) { from = 0; to = text.length; }
+  if (!marks || !marks.length) return esc(text.slice(from, to));
+  var out = '', pos = from;
+  marks.forEach(function(m){
+    var a = Math.max(m.a, pos), b = Math.min(m.b, to); if (a >= b) return;
+    if (a > pos) out += esc(text.slice(pos, a));
+    out += '<mark class="hl hl-' + m.k + '">' + esc(text.slice(a, b)) + '</mark>'; pos = b;
+  });
+  if (pos < to) out += esc(text.slice(pos, to));
+  return out;
+}
+/* Posição no campo "Texto do verso" (com [acordes]) → posição no texto do verso */
+function inputPos(str, pos){
+  var re = /\[([^\]\s]{1,12})\]/g, m, removed = 0;
+  while ((m = re.exec(str)) && m.index < pos) { if (isChord(m[1])) removed += Math.min(m[0].length, pos - m.index); }
+  var lead = str.length - str.replace(/^\s+/, '').length;
+  return Math.max(0, pos - removed - Math.min(lead, pos));
+}
+function usedMarks(s){
+  var used = {};
+  s.lyrics.forEach(function(l){ (l.marks || []).forEach(function(m){ used[m.k] = true; }); });
+  return Object.keys(MARK_COLORS).filter(function(k){ return used[k]; });
+}
+function renderLegend(){
+  var s = curSong(), el = $('#mkLegend'), names = markNames();
+  var ks = s ? usedMarks(s).filter(function(k){ return names[k]; }) : [];
+  if (!ks.length) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = ks.map(function(k){ return '<span><i class="hl-' + k + '"></i>' + esc(names[k]) + '</span>'; }).join('');
+}
+function markNamesEditor(){
+  var names = markNames();
+  modal('<h2>Cores do marca-texto</h2><p>Dê um nome a cada cor, como “Minha voz” ou “2ª voz”. Vale para todas as músicas, e o player mostra a legenda.</p>' +
+    Object.keys(MARK_COLORS).map(function(k){
+      return '<label class="mk-name"><i class="hl-' + k + '"></i><input class="field" data-k="' + k + '" maxlength="24" placeholder="' + MARK_COLORS[k] + '" autocomplete="off"></label>';
+    }).join('') +
+    '<div class="m-actions"><span class="grow"></span><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>');
+  document.querySelectorAll('#sheet .mk-name input').forEach(function(inp){ inp.value = names[inp.dataset.k] || ''; });
+  $('#sheet').onclick = function(e){
+    var b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'ok') {
+      var o = {}; document.querySelectorAll('#sheet .mk-name input').forEach(function(inp){ o[inp.dataset.k] = inp.value; });
+      setMarkNames(cleanMarkNames(o)); toast('Nomes das cores salvos');
+    }
+    closeModal(); if (curSong()) renderLyrics();
+  };
+}
 function chordsOn(){ try { return localStorage.getItem('ensaio-chords') !== 'off'; } catch(e){ return true; } }
 function chordsHtml(l, n){
   var ch = l.chords.slice().sort(function(a, b){ return a.i - b.i; }), text = l.text, out = '';
   if (!text) return '<span class="ch-only">' + ch.map(function(c){ return '<b>' + esc(transposeChord(c.c, n)) + '</b>'; }).join('') + '</span>';
-  if (ch[0].i > 0) out += esc(text.slice(0, ch[0].i));
+  if (ch[0].i > 0) out += markedHtml(text, l.marks, 0, ch[0].i);
   ch.forEach(function(c, k){
     var end = k + 1 < ch.length ? ch[k + 1].i : text.length, seg = text.slice(c.i, end), name = transposeChord(c.c, n);
     var short = seg.length < name.length + 1;
-    out += '<span class="cs' + (short ? ' short' : '') + '"' + (short ? ' style="min-width:' + (name.length * 0.42 + 0.5).toFixed(2) + 'em"' : '') + '><b class="ch">' + esc(name) + '</b>' + (seg ? esc(seg) : '&nbsp;') + '</span>';
+    out += '<span class="cs' + (short ? ' short' : '') + '"' + (short ? ' style="min-width:' + (name.length * 0.42 + 0.5).toFixed(2) + 'em"' : '') + '><b class="ch">' + esc(name) + '</b>' + (seg ? markedHtml(text, l.marks, c.i, end) : '&nbsp;') + '</span>';
   });
   return out;
 }
@@ -558,7 +642,7 @@ function renderNotes(){
 function renderLyrics(){
   var box = $('#lyrics'), s = curSong(); lastActive = -2;
   box.classList.toggle('syncing', !!state.sync || !!state.adjust);
-  if (!s) { box.innerHTML = '<div class="l-empty"><p>Escolha uma música para começar.</p></div>'; return; }
+  if (!s) { box.innerHTML = '<div class="l-empty"><p>Escolha uma música para começar.</p></div>'; $('#mkLegend').hidden = true; return; }
   if (!s.lyrics.length) { box.innerHTML = '<div class="l-empty"><p>Esta música ainda não tem letra.</p><button class="btn" data-act="editlyrics">Adicionar letra</button></div>'; return; }
   var synced = s.lyrics.some(function(l){ return l.t != null; });
   var useSpacer = synced || state.sync;
@@ -569,9 +653,10 @@ function renderLyrics(){
       var tag = tags[i] ? '<div class="part-tag">' + esc(tags[i]) + '</div>' : '';
       if (!l.text && !ch) return tag + (l.chords && l.chords.length ? '' : '<div class="gap"></div>');
       return tag + '<div class="line' + (l.t != null ? ' timed' : '') + (ch ? ' has-ch' + (l.text ? '' : ' ch-line') : '') + '" data-act="line" data-i="' + i + '">' +
-        (ch ? chordsHtml(l, tr) : esc(l.text)) + (l.note ? '<span class="lnote">' + esc(l.note) + '</span>' : '') + '</div>';
+        (ch ? chordsHtml(l, tr) : markedHtml(l.text, l.marks)) + (l.note ? '<span class="lnote">' + esc(l.note) + '</span>' : '') + '</div>';
     }).join('') + '<p class="lhint">Segure um verso para corrigir o texto' + (hasChords(s) ? ', os acordes' : '') + ' ou escrever uma anotação.</p><div class="spacer"></div>';
   if (state.sync || state.adjust) markTarget();
+  renderLegend();
   updateActive();
 }
 function centerLine(i, force){
@@ -956,6 +1041,11 @@ function notesEditor(s){
   };
 }
 function carryNotes(oldL, newL){
+  var mpool = oldL.filter(function(l){ return l.marks && l.marks.length; }).map(function(l){ return { text:l.text, marks:l.marks }; });
+  newL.forEach(function(l){
+    var k = mpool.findIndex(function(p){ return p.text === l.text; });
+    if (k >= 0) { l.marks = mpool[k].marks; mpool.splice(k, 1); }
+  });
   var pool = oldL.filter(function(l){ return l.note; }).map(function(l){ return { text:l.text.trim(), note:l.note }; });
   newL.forEach(function(l){
     var k = pool.findIndex(function(p){ return p.text === l.text.trim(); });
@@ -971,19 +1061,52 @@ function lineEditor(s, i){
     '<label class="m-lbl" for="lvTxt">Texto do verso</label>' +
     '<input class="field" id="lvTxt" maxlength="400" autocomplete="off" spellcheck="false">' +
     (hasChords(s) ? '<p class="small field-hint">Acordes entre colchetes, antes da sílaba: [G]terra</p>' : '') +
+    '<span class="m-lbl">Marca-texto</span>' +
+    '<div class="mk-row" role="group" aria-label="Cor do marca-texto">' + Object.keys(MARK_COLORS).map(function(k){
+      return '<button type="button" class="mk-btn" data-mk="' + k + '"><i class="hl-' + k + '"></i>' + esc(markLabel(k)) + '</button>';
+    }).join('') + '<button type="button" class="mk-btn none" data-mk="">Sem cor</button></div>' +
+    '<p class="small field-hint">Selecione um trecho no texto e toque na cor. Sem seleção, vale para o verso inteiro.</p>' +
+    '<div class="mk-prev" id="mkPrev" aria-live="polite"></div>' +
     '<label class="m-lbl" for="lnTxt">Anotação <span>(opcional)</span></label>' +
     '<textarea class="field notes-ta ln-ta" id="lnTxt" maxlength="200" placeholder="Ex.: entra a segunda voz"></textarea>' +
     '<div class="m-actions"><button class="btn ghost" data-m="del" aria-label="Apagar verso">Apagar</button><span class="grow"></span>' +
     '<button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>');
   $('#lvTxt').value = joinChords(l.text, l.chords); $('#lnTxt').value = l.note || '';
+  /* Cópia de trabalho das marcas: só vai para o verso ao salvar */
+  var work = { text:l.text, marks:(l.marks || []).map(function(m){ return { a:m.a, b:m.b, k:m.k }; }) }, sel = null, inp = $('#lvTxt');
+  function syncWork(){
+    var t = splitChords(cleanVerse(inp.value)).text;
+    if (t !== work.text) { work.marks = relocateMarks(work.text, t, work.marks); work.text = t; }
+    $('#mkPrev').innerHTML = work.text ? markedHtml(work.text, work.marks) : '<span class="muted">(verso vazio)</span>';
+  }
+  syncWork();
+  inp.addEventListener('input', function(){ sel = null; syncWork(); });
+  function keepSel(){ if (document.activeElement === inp) sel = inp.selectionStart !== inp.selectionEnd ? { s:inp.selectionStart, e:inp.selectionEnd } : null; }
+  document.addEventListener('selectionchange', keepSel);
+  ['select','keyup','pointerup'].forEach(function(ev){ inp.addEventListener(ev, keepSel); });
+  /* Tocar na cor não pode tirar a seleção do campo */
+  document.querySelectorAll('#sheet .mk-btn').forEach(function(bt){ ['pointerdown','mousedown'].forEach(function(ev){ bt.addEventListener(ev, function(e){ e.preventDefault(); }); }); });
   $('#sheet').onclick = async function(e){
+    var mk = e.target.closest('[data-mk]');
+    if (mk) {
+      syncWork();
+      var len = work.text.length, a = 0, z = len, part = false;
+      if (sel) { a = inputPos(inp.value, Math.min(sel.s, sel.e)); z = inputPos(inp.value, Math.max(sel.s, sel.e)); part = z > a; if (!part) { a = 0; z = len; } }
+      work.marks = paintMarks(work.marks, len, a, z, mk.dataset.mk);
+      syncWork();
+      toast(mk.dataset.mk ? (part ? 'Trecho marcado' : 'Verso marcado') + ': ' + markLabel(mk.dataset.mk) : (part ? 'Cor tirada do trecho' : 'Cor tirada do verso'), 1600);
+      return;
+    }
     var b = e.target.closest('[data-m]'); if (!b) return;
+    document.removeEventListener('selectionchange', keepSel);
     var m = b.dataset.m;
     if (m === 'x') { closeModal(); return; }
     if (m === 'ok') {
       var sc = splitChords(cleanVerse($('#lvTxt').value)), note = $('#lnTxt').value.trim();
       if (!sc.text && !sc.chords.length) { toast('Escreva o verso ou use Apagar'); $('#lvTxt').focus(); return; }
+      var mks = relocateMarks(work.text, sc.text, work.marks);
       l.text = sc.text; if (sc.chords.length) l.chords = sc.chords; else delete l.chords;
+      if (mks.length) l.marks = mks; else delete l.marks;
       if (note) l.note = note; else delete l.note;
       closeModal();
       try { await save('songs', s); toast('Verso salvo'); } catch(err){ toast('Não foi possível salvar o verso'); }
@@ -1082,6 +1205,11 @@ function cleanLyrics(arr){
         .map(function(c){ return { i: Math.max(0, Math.min(o.text.length, Math.round(c.i))), c: c.c.trim().slice(0, 12) }; });
       if (cs.length) o.chords = cs;
     }
+    if (Array.isArray(l.marks)) {
+      var ms = paintMarks(l.marks.filter(function(m){ return m && MARK_COLORS[m.k] && typeof m.a === 'number' && typeof m.b === 'number'; })
+        .map(function(m){ return { a:Math.round(m.a), b:Math.round(m.b), k:m.k }; }), o.text.length, 0, 0, '');
+      if (ms.length) o.marks = ms;
+    }
     return o;
   });
 }
@@ -1102,7 +1230,7 @@ function buildExport(){
     (p.pendingTitles || []).slice().sort(function(a,b){ return a.pos - b.pos; }).forEach(function(x){ order.splice(Math.min(x.pos, order.length), 0, x.title); });
     return { name:p.name, songs:order };
   });
-  return { app:'ensaio', kind:'dados', version:1, exportedAt:new Date().toISOString(), songs:songs, playlists:playlists };
+  return { app:'ensaio', kind:'dados', version:1, exportedAt:new Date().toISOString(), markNames:cleanMarkNames(markNames()), songs:songs, playlists:playlists };
 }
 function downloadBlob(name, text, type){
   var url = URL.createObjectURL(new Blob([text], { type:type }));
@@ -1155,7 +1283,8 @@ function parseImport(text){
     }),
     playlists: (Array.isArray(data.playlists) ? data.playlists : []).filter(function(p){ return p && typeof p.name === 'string' && p.name.trim() && Array.isArray(p.songs); }).map(function(p){
       return { name:p.name.trim().slice(0, 120), songs:p.songs.filter(function(t){ return typeof t === 'string' && t.trim(); }) };
-    })
+    }),
+    markNames: cleanMarkNames(data.markNames)
   };
 }
 function matchSongs(titles){
@@ -1188,6 +1317,7 @@ async function importData(text){
     $('#sheet').onclick = function(e){ var b = e.target.closest('[data-m]'); if (!b) return; closeModal(); res(b.dataset.m === 'ok'); };
   });
   if (!ok) return;
+  if (Object.keys(data.markNames).length) { var mn = markNames(); Object.keys(data.markNames).forEach(function(k){ mn[k] = data.markNames[k]; }); setMarkNames(mn); }
   if (state.sync) finishSync(true);
   if (state.adjust) finishAdjust(true);
   try {
@@ -1410,9 +1540,10 @@ $('#pEdit').onclick = function(){
      { label:'Tom: transpor' + (s.transpose ? ' (' + (s.transpose > 0 ? '+' : '−') + Math.abs(s.transpose) + ')' : ''), fn:function(){ transposeSheet(s); } },
      { label: chordsOn() ? 'Esconder cifras' : 'Mostrar cifras', fn:toggleChords }
    ] : [])
-   .concat([{ label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }]));
+   .concat([{ label:'Cores do marca-texto', fn:markNamesEditor }, { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }]));
 };
 $('#pNotes').onclick = function(){ if (curSong()) notesEditor(curSong()); };
+$('#mkLegend').onclick = markNamesEditor;
 $('#bPlay').onclick = toggle;
 $('#bPrev').onclick = prev;
 $('#bNext').onclick = next;

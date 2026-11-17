@@ -39,10 +39,11 @@ Anotações
 Observações gerais por música (tom, capotraste, estrutura)
 Segure um verso no player para corrigir o texto ou pôr uma anotação, sem perder o tempo dele nem abrir a letra toda
 Anotações presas a um verso, como “entra a segunda voz”
+Marca-texto: pinte o verso inteiro ou só um trecho com quatro cores, e dê nome às cores (“Minha voz”, “2ª voz”, “Coro”) para aparecer uma legenda no player
 
 Backup e troca de celular
 
-Exportar dados: um arquivo .json pequeno com letras e tempos, cifras e tom, partes, observações, anotações nos versos e playlists (os áudios não vão junto, para o arquivo continuar leve)
+Exportar dados: um arquivo .json pequeno com letras e tempos, cifras e tom, partes, marca-texto, observações, anotações nos versos e playlists (os áudios não vão junto, para o arquivo continuar leve)
 Importar dados: antes de mudar algo, mostra o que vai acontecer. Músicas com o mesmo nome recebem a letra do arquivo; as que ainda não estão no aparelho ficam “esperando o áudio” e a letra entra sozinha quando você adiciona um áudio com o mesmo nome, inclusive na posição certa da playlist
 
 App instalável (PWA)
@@ -130,7 +131,7 @@ Cada linha sincronizada começa com o tempo entre colchetes:
 [00:12.40]Primeiro verso da letra
 [00:17.85]Segundo verso da letra
 
-Acordes, observações e anotações não entram no .lrc, porque o formato não tem lugar para eles. Para levá-los junto, use Exportar dados.
+Acordes, marca-texto, observações e anotações não entram no .lrc, porque o formato não tem lugar para eles. Para levá-los junto, use Exportar dados.
 
 Arquivo de dados (.json)
 
@@ -138,12 +139,14 @@ Arquivo de dados (.json)
 {
  "app": "ensaio", "kind": "dados", "version": 1,
  "exportedAt": "2026-11-12T10:00:00.000Z",
+ "markNames": { "y": "Minha voz", "g": "2ª voz" },
  "songs": [
   { "title": "Nome da música", "notes": "Tom de Ré", "duration": 212.4,
     "transpose": 2,
     "parts": [ { "t": 0, "name": "Intro" }, { "t": 12.4, "name": "Verso" }, { "t": 33.2, "name": "Refrão" } ],
     "lyrics": [ { "text": "Primeiro verso", "t": 12.4, "note": "entra a segunda voz",
-                  "chords": [ { "i": 0, "c": "D" }, { "i": 9, "c": "G" } ] } ] }
+                  "chords": [ { "i": 0, "c": "D" }, { "i": 9, "c": "G" } ],
+                  "marks": [ { "a": 0, "b": 8, "k": "y" } ] } ] }
  ],
  "playlists": [ { "name": "Ensaio de sábado", "songs": ["Nome da música"] } ]
 }
@@ -151,4 +154,4 @@ Arquivo de dados (.json)
 
 Na importação, as músicas são ligadas pelo título, sem diferença de maiúsculas, acentos e “_”.
 
-Os acordes ficam à parte do texto (chords: i é a posição do caractere no verso, c é o acorde), então a busca, o .lrc e a sincronização não são afetados. transpose são os semitons escolhidos para a música (−11 a 11). parts, chords e transpose são opcionais: arquivos exportados antes desta versão continuam importando.
+Os acordes ficam à parte do texto (chords: i é a posição do caractere no verso, c é o acorde), então a busca, o .lrc e a sincronização não são afetados. transpose são os semitons escolhidos para a música (−11 a 11). marks são os trechos com marca-texto (a e b: começo e fim no texto; k: y amarelo, g verde, p rosa, b azul), e markNames são os nomes das cores. parts, chords, transpose, marks e markNames são opcionais: arquivos exportados antes desta versão continuam importando.

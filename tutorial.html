@@ -48,6 +48,7 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
     <li><a href="#sincronizar">Sincronizar a letra</a></li>
     <li><a href="#ajustar">Ajustar tempos</a></li>
     <li><a href="#verso">Corrigir um verso e anotar</a></li>
+    <li><a href="#marca-texto">Marca-texto</a></li>
     <li><a href="#ferramentas">Ferramentas de ensaio</a></li>
     <li><a href="#lrc">Exportar a letra (.lrc)</a></li>
     <li><a href="#tema">Tema claro ou escuro</a></li>
@@ -360,8 +361,35 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
   </div>
 </section>
 
+<section class="tut-sec" id="marca-texto">
+  <h2><span class="n">13</span>Marca-texto</h2>
+  <p class="sec-lead">Pinte versos ou trechos: quem canta cada parte, onde entra o coro, a palavra para caprichar.</p>
+  <div class="step">
+    <figure class="phone"><img src="img/tutorial/36-marca-texto.webp" width="780" height="1688" loading="lazy" alt="Editar verso com a palavra saudade selecionada e as cores do marca-texto"></figure>
+    <div class="txt">
+      <h3>Marcar</h3>
+      <ol>
+        <li>No player, <b>segure o verso</b>.</li>
+        <li>Para marcar só um trecho, <b>selecione as palavras</b> no campo de texto. Sem seleção, a cor vale para o verso inteiro.</li>
+        <li>Toque na cor. A prévia mostra como fica.</li>
+        <li>Toque em <b>Salvar</b>.</li>
+      </ol>
+      <p><b>Sem cor</b> tira a marcação do trecho selecionado ou do verso todo. Se você mudar o texto, a marcação acompanha as palavras que continuarem iguais.</p>
+    </div>
+  </div>
+  <div class="step">
+    <figure class="phone"><img src="img/tutorial/37-legenda.webp" width="780" height="1688" loading="lazy" alt="Player com versos marcados em cores e a legenda Minha voz, 2ª voz e Todos"></figure>
+    <div class="txt">
+      <h3>Nomes das cores e legenda</h3>
+      <p>Em <b>Letra → Cores do marca-texto</b>, dê nome a cada cor: “Minha voz”, “2ª voz”, “Todos”… Os nomes aparecem nos botões de cor e numa legenda no alto do player, só com as cores usadas na música.</p>
+      <p>Os nomes valem para todas as músicas e vão junto no <a href="#backup">Exportar dados</a>.</p>
+      <p class="tip">Dupla ou coral? Combine as cores com a banda e cada um importa o mesmo arquivo de dados: todo mundo lê a letra marcada do mesmo jeito.</p>
+    </div>
+  </div>
+</section>
+
 <section class="tut-sec" id="ferramentas">
-  <h2><span class="n">13</span>Ferramentas de ensaio</h2>
+  <h2><span class="n">14</span>Ferramentas de ensaio</h2>
   <p class="sec-lead">A fileira de botões no rodapé do player: <b>velocidade</b>, <b>A–B</b>, <b>ao terminar</b>, <b>Sincronizar</b> e <b>Aa</b>.</p>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/19-velocidade.webp" width="780" height="1688" loading="lazy" alt="Menu de velocidade de 0,5 a 1,25 vezes"></figure>
@@ -408,7 +436,7 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
 </section>
 
 <section class="tut-sec" id="lrc">
-  <h2><span class="n">14</span>Exportar a letra (.lrc)</h2>
+  <h2><span class="n">15</span>Exportar a letra (.lrc)</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/23-exportar-lrc.webp" width="780" height="1688" loading="lazy" alt="Janela Exportar letra com o conteúdo do arquivo .lrc"></figure>
     <div class="txt">
@@ -418,13 +446,13 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
         <li><b>Baixar arquivo:</b> quando aparece, salva como <code>.lrc.txt</code>; renomeie tirando o “.txt”.</li>
         <li><b>Copiar texto:</b> copia o conteúdo.</li>
       </ul>
-      <p>O .lrc abre em outros players com letra sincronizada. Acordes, observações e anotações não vão nele; para levá-las, use <a href="#backup">Exportar dados</a>.</p>
+      <p>O .lrc abre em outros players com letra sincronizada. Acordes, marca-texto, observações e anotações não vão nele; para levá-las, use <a href="#backup">Exportar dados</a>.</p>
     </div>
   </div>
 </section>
 
 <section class="tut-sec" id="tema">
-  <h2><span class="n">15</span>Tema claro ou escuro</h2>
+  <h2><span class="n">16</span>Tema claro ou escuro</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/25-tema.webp" width="780" height="1688" loading="lazy" alt="Menu Tema com Automático, Claro e Escuro"></figure>
     <div class="txt">
@@ -445,13 +473,13 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
 </section>
 
 <section class="tut-sec" id="backup">
-  <h2><span class="n">16</span>Backup e troca de celular</h2>
+  <h2><span class="n">17</span>Backup e troca de celular</h2>
   <p class="sec-lead">Tudo fica só no navegador deste celular. <b>Limpar os dados do navegador apaga tudo</b>, então faça um backup de vez em quando.</p>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/26-exportar-dados.webp" width="780" height="1688" loading="lazy" alt="Janela Exportar dados com o resumo do arquivo"></figure>
     <div class="txt">
       <h3>Exportar dados</h3>
-      <p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as cifras e o tom, as partes, as observações, as anotações e as playlists.</p>
+      <p>No fim da aba <b>Músicas</b>, toque em <b>Exportar dados</b>. Sai um arquivo <code>.json</code> pequeno com as letras e seus tempos, as cifras e o tom, as partes, o marca-texto, as observações, as anotações e as playlists.</p>
       <p><b>Os áudios não vão junto</b>, para o arquivo continuar leve. Guarde no Drive ou mande para você mesmo por mensagem ou e-mail.</p>
     </div>
   </div>
@@ -478,7 +506,7 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
 </section>
 
 <section class="tut-sec" id="instalar">
-  <h2><span class="n">17</span>Instalar e atualizar</h2>
+  <h2><span class="n">18</span>Instalar e atualizar</h2>
   <div class="step">
     <figure class="phone"><img src="img/tutorial/29-instalar.webp" width="780" height="1688" loading="lazy" alt="Ajuda com a seção Instalar no celular e o botão Instalar o app"></figure>
     <div class="txt">
@@ -501,7 +529,7 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
 </section>
 
 <section class="tut-sec" id="roteiro">
-  <h2><span class="n">18</span>Roteiro de um ensaio</h2>
+  <h2><span class="n">19</span>Roteiro de um ensaio</h2>
   <div class="cards">
     <div class="card">
       <h3>Antes</h3>
@@ -519,7 +547,7 @@ if(window.parent!==window)document.documentElement.classList.add('embed');</scri
         <li>Segure a parte difícil e escolha <b>Repetir esta parte</b> (ou marque um trecho com <b>A–B</b>).</li>
         <li>Baixe para 0,75× e vá subindo até 1×.</li>
         <li>Use <b>Repetir esta música</b> para passar várias vezes sem tocar no celular.</li>
-        <li>Segure os versos para anotar entradas e respirações.</li>
+        <li>Segure os versos para anotar entradas e respirações, e pinte com o marca-texto o que é seu.</li>
       </ul>
     </div>
     <div class="card">
