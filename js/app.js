@@ -371,13 +371,14 @@ function renderView(){
     }
     m.innerHTML = state.playlists.map(function(p){
       var n = p.songIds.length, w = (p.pendingTitles || []).length;
-      return '<div class="row' + (state.queueName === p.name && curSong() ? ' playing' : '') + '"><button class="row-main" data-act="openpl" data-id="' + p.id + '"><span class="t">' + esc(p.name) + '</span><span class="s">' + n + (n === 1 ? ' música' : ' músicas') + (w ? ', ' + w + ' esperando o áudio' : '') + '</span></button></div>';
+      return '<div class="row' + (state.queueName === p.name && curSong() ? ' playing' : '') + '"><button class="row-main" data-act="openpl" data-id="' + p.id + '"><span class="t">' + esc(p.name) + '</span><span class="s">' + n + (n === 1 ? ' música' : ' músicas') + (plDuration(p) ? ', ' + plDuration(p) : '') + (w ? ', ' + w + ' esperando o áudio' : '') + '</span></button></div>';
     }).join('');
   } else {
     var p = plById(state.openPl);
     if (!p) { state.view = 'playlists'; render(); return; }
     var html = '<div class="pl-actions">' + (p.songIds.length ? '<button class="btn" data-act="plplay">Tocar playlist</button>' : '') +
-      '<button class="btn sec" data-act="pladd">Escolher músicas</button><button class="btn sec" data-act="plmore">Opções</button></div>';
+      '<button class="btn sec" data-act="pladd">Escolher músicas</button><button class="btn sec" data-act="plmore">Opções</button></div>' +
+      (p.songIds.length ? '<p class="pl-dur">' + p.songIds.length + (p.songIds.length === 1 ? ' música' : ' músicas') + (plDuration(p) ? ' · ' + plDuration(p) + ' de repertório' : '') + '</p>' : '');
     if (!p.songIds.length) html += '<div class="empty"><p>Esta playlist está vazia. Toque em “Escolher músicas” para montar a ordem.</p></div>';
     if (p.pendingTitles && p.pendingTitles.length) html += '<p class="foot">Esperando o áudio: ' + esc(p.pendingTitles.map(function(x){ return x.title; }).join(', ')) + '. Ao adicionar um arquivo com o mesmo nome, ela entra na playlist sozinha.</p>';
     html += p.songIds.map(function(id, i){
@@ -494,7 +495,7 @@ function renderPlayerHead(){
   $('#pTitle').textContent = s ? s.title : 'Nada tocando';
   $('#pSub').textContent = s ? (state.qi+1) + ' de ' + state.queue.length + ', ' + state.queueName : '';
 }
-function renderPlayer(){ renderPlayerHead(); renderNotes(); renderLyrics(); renderTools(); setPlayIcons(); }
+function renderPlayer(){ renderPlayerHead(); renderNotes(); renderLyrics(); renderTools(); setPlayIcons(); renderStage(); }
 
 /* ---------- Partes da música (Intro, Verso, Refrão…) ---------- */
 var PART_NAMES = ['Intro', 'Verso', 'Pré-refrão', 'Refrão', 'Ponte', 'Solo', 'Final'];
@@ -698,7 +699,7 @@ function renderTools(){
   $('#tools').hidden = syncing || !!adj; $('#syncBar').hidden = !syncing; $('#adjBar').hidden = !adj;
   if (adj) renderAdjust();
 }
-async function playAt(i){
+async function playAt(i, noPlay){
   if (i < 0 || i >= state.queue.length) return;
   if (state.sync) finishSync(true);
   if (state.adjust) finishAdjust(true);
@@ -711,7 +712,7 @@ async function playAt(i){
   audio.src = curUrl;
   applyRate();
   state.loopA = state.loopB = null; state.loopPart = null; lastPart = -2;
-  try { await audio.play(); } catch(e){}
+  if (!noPlay) { try { await audio.play(); } catch(e){} }
   updateMediaSession();
   renderMini(); renderPlayer(); renderView();
   if (playerOpen) setTimeout(function(){ userScrollAt = 0; lastActive = -2; updateActive(); $('#lyrics').scrollTop = 0; }, 50);
@@ -789,7 +790,7 @@ function tick(){
 
 /* Tela ligada durante o ensaio */
 async function requestWake(){
-  try { if ('wakeLock' in navigator && playerOpen && !audio.paused && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', function(){ wakeLock = null; }); } } catch(e){}
+  try { if ('wakeLock' in navigator && playerOpen && (!audio.paused || stageOn()) && !wakeLock) { wakeLock = await navigator.wakeLock.request('screen'); wakeLock.addEventListener('release', function(){ wakeLock = null; }); } } catch(e){}
 }
 function releaseWake(){ try { if (wakeLock) wakeLock.release(); } catch(e){} wakeLock = null; }
 document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'visible') requestWake(); });
@@ -965,7 +966,7 @@ $('#modal').addEventListener('click', function(e){ if (e.target === $('#modal') 
 $('#sheet').addEventListener('click', function(e){ if (Date.now() - modalOpenedAt < 450) { e.stopImmediatePropagation(); e.preventDefault(); } }, true);
 document.addEventListener('keydown', function(e){
   if (e.key !== 'Escape') return;
-  if (!$('#modal').hidden) cancelModal(); else if (playerOpen) closePlayer();
+  if (!$('#modal').hidden) cancelModal(); else if (stageOn()) exitStage(); else if (playerOpen) closePlayer();
 });
 function actionSheet(title, actions){
   modal('<h2>' + esc(title) + '</h2><div class="acts">' + actions.map(function(a, i){
@@ -1483,6 +1484,8 @@ document.addEventListener('click', async function(e){
     case 'export': exportData(); break;
     case 'theme': themeMenu(); break;
     case 'install': doInstall(); break;
+    case 'pedal': pedalSheet(); break;
+    case 'stage': if (curSong()) enterStage(); else toast('Toque uma música primeiro'); break;
     case 'tutorial': e.preventDefault(); openTutorial(); break;
     case 'import': $('#dataFile').value = ''; $('#dataFile').click(); break;
     case 'droppending':
@@ -1517,6 +1520,7 @@ document.addEventListener('click', async function(e){
     case 'editlyrics': if (curSong()) lyricsEditor(curSong()); break;
     case 'line':
       if (lyrLp.suppress) { lyrLp.suppress = false; break; }
+      if (stageOn()) { showStageCtl(!$('#player').classList.contains('show-ctl')); break; }
       var s = curSong(); if (!s) break;
       if (state.sync) { state.sync.idx = i; markTarget(); break; }
       if (state.adjust) {
@@ -1544,6 +1548,10 @@ $('#pEdit').onclick = function(){
 };
 $('#pNotes').onclick = function(){ if (curSong()) notesEditor(curSong()); };
 $('#mkLegend').onclick = markNamesEditor;
+$('#pStage').onclick = enterStage;
+$('#stExit').onclick = exitStage;
+document.querySelectorAll('.st-edge').forEach(function(b){ b.onclick = function(){ stageSong(+b.dataset.st); }; });
+['pointerdown','input'].forEach(function(ev){ $('.p-bottom').addEventListener(ev, function(){ if (stageOn() && $('#player').classList.contains('show-ctl')) showStageCtl(true); }, {passive:true}); });
 $('#bPlay').onclick = toggle;
 $('#bPrev').onclick = prev;
 $('#bNext').onclick = next;
@@ -1616,7 +1624,8 @@ function longPress(box, sel, fn){
   return st;
 }
 /* Segurar um verso abre a edição do verso (texto, acordes e anotação; o tempo não muda) */
-var lyrLp = longPress($('#lyrics'), '.line', function(el){ var s = curSong(); if (s) lineEditor(s, +el.dataset.i); });
+var lyrLp = longPress($('#lyrics'), '.line', function(el){ if (stageOn()) return; var s = curSong(); if (s) lineEditor(s, +el.dataset.i); });
+$('#lyrics').addEventListener('click', function(e){ if (stageOn() && !e.target.closest('.line, button')) showStageCtl(!$('#player').classList.contains('show-ctl')); });
 /* Partes: tocar pula, segurar abre o menu da parte */
 var partLp = longPress($('#parts'), '.part-chip[data-k]', function(el){ partMenu(+el.dataset.k); });
 $('#parts').addEventListener('click', function(e){
@@ -1632,7 +1641,7 @@ seek.addEventListener('change', function(){ if (audio.duration) audio.currentTim
 
 /* Eventos do áudio */
 audio.addEventListener('play', function(){ setPlayIcons(); requestWake(); });
-audio.addEventListener('pause', function(){ setPlayIcons(); releaseWake(); });
+audio.addEventListener('pause', function(){ setPlayIcons(); if (!stageOn()) releaseWake(); });
 audio.addEventListener('timeupdate', checkLoop);
 audio.addEventListener('loadedmetadata', function(){
   applyRate(); renderTools();
@@ -1651,6 +1660,164 @@ audio.addEventListener('ended', function(){
   else { restartSong(); setPlayIcons(); }
 });
 audio.addEventListener('error', function(){ if (audio.src) toast('Este formato de áudio não toca neste aparelho'); });
+
+/* ---------- Modo palco: tela cheia só com a letra ---------- */
+var stageCtlTimer = null;
+function stageOn(){ return $('#player').classList.contains('stage'); }
+function nextTitle(){
+  var j = state.qi + 1;
+  if (j >= state.queue.length) j = repeatMode === 'all' && state.queue.length > 1 ? 0 : -1;
+  var s = j >= 0 ? songById(state.queue[j]) : null;
+  return s ? s.title : null;
+}
+function renderStage(){
+  if (!stageOn()) return;
+  var s = curSong(), nx = nextTitle();
+  $('#stTitle').textContent = s ? s.title : '';
+  $('#stNext').innerHTML = (state.queue.length > 1 ? '<b>' + (state.qi + 1) + ' de ' + state.queue.length + '</b> · ' : '') + (nx ? 'A seguir: ' + esc(nx) : 'Última música');
+}
+function enterStage(){
+  if (!curSong() || stageOn()) return;
+  if (!playerOpen) openPlayer();
+  if (state.sync) finishSync();
+  if (state.adjust) finishAdjust();
+  $('#player').classList.add('stage'); $('#stageTop').hidden = false;
+  renderStage(); showStageCtl(false);
+  try { var el = document.documentElement; if (el.requestFullscreen && !document.fullscreenElement) el.requestFullscreen({ navigationUI:'hide' }).catch(function(){}); } catch(e){}
+  try { history.pushState({ stage:true }, ''); } catch(e){}
+  requestWake();
+  setTimeout(function(){ lastActive = -2; userScrollAt = 0; updateActive(); }, 80);
+  toast('Modo palco: toque na letra para ver os controles. Nas bordas, troca de música.', 3500);
+}
+function hideStage(){
+  $('#player').classList.remove('stage', 'show-ctl'); $('#stageTop').hidden = true;
+  clearTimeout(stageCtlTimer);
+  try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen().catch(function(){}); } catch(e){}
+  if (audio.paused) releaseWake();
+  setTimeout(function(){ lastActive = -2; userScrollAt = 0; updateActive(); }, 80);
+}
+function exitStage(){
+  if (!stageOn()) return;
+  hideStage();
+  if (history.state && history.state.stage) history.back();
+}
+function showStageCtl(on){
+  var p = $('#player'); clearTimeout(stageCtlTimer);
+  p.classList.toggle('show-ctl', !!on);
+  if (on) stageCtlTimer = setTimeout(function hide(){
+    if (!$('#modal').hidden || seeking) { stageCtlTimer = setTimeout(hide, 2000); return; }
+    p.classList.remove('show-ctl');
+  }, 5000);
+}
+/* No palco, trocar de música deixa a próxima pronta, sem tocar: a banda entra junto */
+function stageSong(d){
+  var j = state.qi + d;
+  if (j >= state.queue.length) { if (repeatMode === 'all' && state.queue.length > 1) j = 0; else { toast('Esta é a última música da fila'); return; } }
+  if (j < 0) { toast('Esta é a primeira música da fila'); return; }
+  playAt(j, true).then(function(){ renderStage(); showStageCtl(true); var s = curSong(); if (s) toast('Pronta: ' + s.title + '. Toque em ▶ para começar', 3000); });
+}
+window.addEventListener('popstate', function(){ if (stageOn() && !(history.state && history.state.stage)) hideStage(); });
+document.addEventListener('fullscreenchange', function(){ if (!document.fullscreenElement && stageOn()) setTimeout(function(){ lastActive = -2; updateActive(); }, 80); });
+
+/* ---------- Pedal e teclado ---------- */
+var PEDAL = {
+  parts: { label:'Partes', down:'próxima parte', up:'começo da parte (2 toques: parte anterior)' },
+  play:  { label:'Tocar', down:'tocar / pausar', up:'volta ao começo da parte' },
+  songs: { label:'Músicas', down:'próxima música', up:'música anterior' }
+};
+function pedalMode(){ try { var m = localStorage.getItem('ensaio-pedal'); return PEDAL[m] ? m : 'parts'; } catch(e){ return 'parts'; } }
+function seekBy(d){ if (!audio.src) return; audio.currentTime = Math.max(0, Math.min(audio.duration || 0, audio.currentTime + d)); lastActive = -2; userScrollAt = 0; }
+var noPartsWarned = false;
+function partStart(){
+  var s = curSong(), p = partsOf(s); if (!audio.src) return;
+  if (!p.length) { seekBy(-5); return; }
+  var cur = partAt(s, audio.currentTime);
+  if (cur < 0) { audio.currentTime = 0; lastActive = -2; return; }
+  if (audio.currentTime - p[cur].t > 2 || cur === 0) jumpPart(cur); else jumpPart(cur - 1);
+}
+function partStep(d){
+  var s = curSong(), p = partsOf(s); if (!s || !audio.src) return;
+  if (!p.length) {
+    seekBy(d * 5);
+    if (!noPartsWarned) { noPartsWarned = true; toast('Esta música não tem partes marcadas: o pedal avança e volta 5 s', 3000); }
+    return;
+  }
+  if (d < 0) { partStart(); return; }
+  var cur = partAt(s, audio.currentTime);
+  if (cur + 1 < p.length) jumpPart(cur + 1); else toast('Esta é a última parte');
+}
+function songStep(d){
+  if (stageOn()) { stageSong(d); return; }
+  var j = state.qi + d;
+  if (j >= state.queue.length) { if (repeatMode === 'all' && state.queue.length > 1) j = 0; else { toast('Esta é a última música da fila'); return; } }
+  if (j < 0) { toast('Esta é a primeira música da fila'); return; }
+  playAt(j);
+}
+function pedal(d){
+  var m = pedalMode();
+  if (m === 'play') { if (d > 0) toggle(); else partStart(); }
+  else if (m === 'songs') songStep(d);
+  else partStep(d);
+}
+function loopCurrentPart(){
+  var s = curSong(), p = partsOf(s), cur = partAt(s, audio.currentTime);
+  if (cur < 0) { toast('Marque as partes da música para repetir uma delas'); return; }
+  if (state.loopPart === p[cur]) stopLoop(); else loopPart(p[cur]);
+}
+function pedalSheet(){
+  function body(){
+    var cur = pedalMode();
+    return '<h2>Pedal e teclado</h2><p>Pedais de virar página (Bluetooth) funcionam como teclado. Escolha o que os dois botões do pedal fazem:</p>' +
+      '<div class="acts">' + Object.keys(PEDAL).map(function(k){
+        var x = PEDAL[k];
+        return '<button class="act pedal-opt' + (k === cur ? ' on' : '') + '" data-pm="' + k + '"><b>' + x.label + (k === cur ? '  ✓' : '') + '</b><span>Direito ou de baixo: ' + x.down + '<br>Esquerdo ou de cima: ' + x.up + '</span></button>';
+      }).join('') + '</div>' +
+      '<h3 class="kb-h">Teclado</h3><dl class="kb">' +
+      '<dt>Espaço</dt><dd>tocar / pausar</dd><dt>← →</dt><dd>voltar / avançar 5 s</dd>' +
+      '<dt>↑ ↓ · PgUp PgDn</dt><dd>os botões do pedal</dd><dt>Shift + ← →, P N</dt><dd>música anterior / próxima</dd>' +
+      '<dt>L</dt><dd>repetir a parte atual (liga e desliga)</dd><dt>F</dt><dd>modo palco</dd><dt>?</dt><dd>esta janela</dd></dl>' +
+      '<p class="small">Se o pedal não responder, confira se ele está pareado com o celular e no modo de setas ou de página (veja o manual do pedal).</p>' +
+      '<div class="m-actions"><span class="grow"></span><button class="btn" data-m="x">Pronto</button></div>';
+  }
+  modal(body());
+  $('#sheet').onclick = function(e){
+    var o = e.target.closest('[data-pm]');
+    if (o) { try { localStorage.setItem('ensaio-pedal', o.dataset.pm); } catch(_){} $('#sheet').innerHTML = body(); toast('Pedal: ' + PEDAL[o.dataset.pm].label); return; }
+    var b = e.target.closest('[data-m]'); if (b) closeModal();
+  };
+}
+document.addEventListener('keydown', function(e){
+  if (e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (!$('#modal').hidden || tutorialOpen()) return;
+  var t = e.target;
+  if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
+  var k = e.key, done = true;
+  if (k === '?') { pedalSheet(); e.preventDefault(); return; }
+  if (!curSong()) return;
+  switch (k) {
+    case ' ': case 'k': case 'K': toggle(); break;
+    case 'PageDown': pedal(1); break;
+    case 'PageUp': pedal(-1); break;
+    case 'ArrowDown': if (playerOpen) pedal(1); else done = false; break;
+    case 'ArrowUp': if (playerOpen) pedal(-1); else done = false; break;
+    case 'ArrowRight': if (e.shiftKey) songStep(1); else seekBy(5); break;
+    case 'ArrowLeft': if (e.shiftKey) songStep(-1); else seekBy(-5); break;
+    case 'n': case 'N': songStep(1); break;
+    case 'p': case 'P': songStep(-1); break;
+    case 'l': case 'L': loopCurrentPart(); break;
+    case 'f': case 'F': if (stageOn()) exitStage(); else enterStage(); break;
+    default: done = false;
+  }
+  if (done) e.preventDefault();
+});
+
+/* Duração do repertório */
+function durText(sec){ var m = Math.round(sec / 60); if (m < 60) return m + ' min'; return Math.floor(m / 60) + ' h ' + (m % 60 < 10 ? '0' : '') + (m % 60) + ' min'; }
+function plDuration(p){
+  var tot = 0, unknown = 0;
+  p.songIds.forEach(function(id){ var s = songById(id); if (s && s.duration) tot += s.duration; else unknown++; });
+  return tot ? (unknown ? 'mais de ' : '') + durText(tot) : '';
+}
 
 /* ---------- Tutorial (tutorial.html por cima do app, para a música continuar) ---------- */
 function tutorialOpen(){ return !$('#tutorial').hidden; }

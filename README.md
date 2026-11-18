@@ -11,7 +11,7 @@ Músicas e playlists
 Adicione arquivos de áudio direto do celular (MP3, M4A e outros formatos que o navegador toque)
 Busca por nome ou por trecho da letra, sem diferença de maiúsculas e acentos; tocar a partir da busca usa só os resultados como fila
 Lista em páginas de 10, 20 ou 50 músicas (o app nunca desenha a lista inteira de uma vez)
-Monte playlists com o repertório na ordem do ensaio
+Monte playlists com o repertório na ordem do ensaio, com a duração total
 Escolha o que acontece ao terminar uma música: pausar, seguir a fila até o fim (padrão), repetir a música ou repetir a fila toda
 Controles na tela de bloqueio e nos fones, quando o celular permite
 
@@ -31,6 +31,8 @@ Repetição de trecho (A–B)
 Partes da música (Intro, Verso, Refrão…): marque onde cada uma começa, toque para ir direto a ela e segure para repetir a parte inteira
 Botões de −5 s e +5 s
 Três tamanhos de letra, para ler de longe na estante
+Modo palco: tela cheia só com a letra bem grande (com cifras e marca-texto) e a próxima música no alto; toque nas bordas para trocar de música, que fica pronta sem tocar
+Pedal de virar página (Bluetooth) e teclado: próxima parte, tocar/pausar ou trocar de música com as mãos livres; atalhos como Espaço, setas, L (repetir a parte) e F (modo palco)
 Tema claro, escuro ou automático (segue o celular), escolhido no ícone do cabeçalho
 Tela acesa enquanto a música toca
 

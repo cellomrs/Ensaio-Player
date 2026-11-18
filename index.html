@@ -40,8 +40,15 @@
     <div class="p-top">
       <button class="icon-btn" id="pClose" aria-label="Fechar player"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="p-title"><span id="pTitle" class="t"></span><span id="pSub" class="s"></span></div>
+      <button class="icon-btn" id="pStage" aria-label="Modo palco (tela cheia só com a letra)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
       <button class="text-btn" id="pEdit">Letra</button>
     </div>
+    <div class="stage-top" id="stageTop" hidden>
+      <div class="st-t"><span id="stTitle"></span><span id="stNext"></span></div>
+      <button class="icon-btn" id="stExit" aria-label="Sair do modo palco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
+    </div>
+    <button class="st-edge prev" data-st="-1" aria-label="Música anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <button class="st-edge next" data-st="1" aria-label="Próxima música"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     <button id="pNotes" class="notes" hidden aria-label="Observações da música"></button>
     <button id="mkLegend" class="mk-legend" hidden aria-label="Legenda do marca-texto. Toque para mudar os nomes das cores"></button>
     <div id="lyrics" class="lyrics" data-size="m"></div>
@@ -302,6 +309,36 @@
 <p>O nome é comparado sem diferença de maiúsculas, acentos e “_”. Se o arquivo de áudio tiver outro nome, renomeie o arquivo antes de adicionar.</p>
 </div></details>
 
+<details><summary>Modo palco</summary><div class="body">
+<p>Para tocar ao vivo ou ensaiar de longe: tela cheia, só a letra (com cifras e marca-texto) bem grande, e a próxima música no alto.</p>
+<ul>
+<li><b>Entrar:</b> no player, toque no ícone de tela cheia, ao lado de <b>Letra</b> (ou a tecla <b>F</b>).</li>
+<li><b>Controles:</b> toque na letra para mostrar ou esconder os controles. Eles somem sozinhos depois de alguns segundos.</li>
+<li><b>Trocar de música:</b> toque nas bordas da tela, à esquerda (anterior) ou à direita (próxima). A música fica pronta, parada, para a banda entrar junto: toque em ▶ para começar.</li>
+<li><b>Sair:</b> o <b>×</b> no alto, o botão voltar do celular ou a tecla Esc.</li>
+</ul>
+<p>No palco, tocar ou segurar um verso não pula a música nem abre a edição, para evitar toques sem querer. A tela fica acesa mesmo com a música parada.</p>
+<p>Nas playlists aparece a duração total do repertório.</p>
+</div></details>
+
+<details><summary>Pedal e teclado</summary><div class="body">
+<p>Pedais de virar página (Bluetooth) funcionam como teclado: pareie o pedal com o celular e ele já controla o Ensaio, com as mãos livres no instrumento.</p>
+<p>Escolha o que os dois botões do pedal fazem:</p>
+<ul>
+<li><b>Partes</b> (padrão): próxima parte, ou volta ao começo da parte (dois toques: parte anterior). Sem partes marcadas, avança e volta 5 s.</li>
+<li><b>Tocar:</b> tocar/pausar e voltar ao começo da parte.</li>
+<li><b>Músicas:</b> próxima música e anterior. No modo palco, a música fica pronta sem tocar.</li>
+</ul>
+<p><button class="btn" data-act="pedal">Configurar o pedal</button></p>
+<h3>Teclado (computador ou teclado Bluetooth)</h3>
+<ul>
+<li><b>Espaço:</b> tocar / pausar. <b>← →:</b> voltar / avançar 5 s.</li>
+<li><b>↑ ↓</b> e <b>PgUp PgDn:</b> os botões do pedal.</li>
+<li><b>Shift + ← →</b> ou <b>P</b> e <b>N</b>: música anterior / próxima.</li>
+<li><b>L:</b> repetir a parte atual. <b>F:</b> modo palco. <b>?:</b> mostra os atalhos.</li>
+</ul>
+</div></details>
+
 <details><summary>Problemas comuns</summary><div class="body">
 <h3>“Este formato de áudio não toca neste aparelho”</h3>
 <p>Converta o arquivo para MP3 ou M4A.</p>
@@ -320,7 +357,9 @@
 <h3>Os acordes ficaram na sílaba errada</h3>
 <p>No formato dos sites de cifra, a posição vem dos espaços da linha de acordes. Se o site usava outra fonte, eles podem sair deslocados. Segure o verso e mova o acorde entre colchetes para antes da sílaba certa.</p>
 <h3>Segurar o verso não abre a edição</h3>
-<p>Segure o dedo parado, sem arrastar, por cerca de meio segundo.</p>
+<p>Segure o dedo parado, sem arrastar, por cerca de meio segundo. No modo palco a edição fica desligada; saia dele para editar.</p>
+<h3>O pedal não faz nada</h3>
+<p>Confira se ele está pareado com o celular e no modo de setas ou de página (veja o manual do pedal). Com uma janela aberta no Ensaio, o pedal fica parado até ela fechar.</p>
 <h3>Não aparece “Compartilhar .lrc”</h3>
 <p>O navegador não permite compartilhar arquivos daqui. Use Baixar arquivo ou Copiar texto.</p>
 </div></details>
