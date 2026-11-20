@@ -1192,8 +1192,11 @@ function normTitle(t){ return String(t || '').normalize('NFD').replace(/[̀-ͯ]/
 function pendingBlock(){
   if (!state.pending.length) return '';
   var names = state.pending.slice().sort(function(a,b){ return a.title.localeCompare(b.title, 'pt-BR'); }).map(function(p){ return p.title; });
-  return '<div class="pending"><h3>Esperando o áudio (' + names.length + ')</h3><p>Letras importadas de músicas que ainda não estão neste aparelho. Adicione um arquivo de áudio com o mesmo nome e a letra entra sozinha.</p>' +
-    '<p class="pending-list">' + esc(names.join(' · ')) + '</p><button class="btn ghost" data-act="droppending">Descartar estas letras</button></div>';
+  var rows = state.pending.slice().sort(function(a,b){ return a.title.localeCompare(b.title, 'pt-BR'); }).map(function(p){
+    return '<div class="pending-row"><span class="pr-t">' + esc(p.title) + '</span><button class="btn sec small" data-act="pendaudio" data-id="' + esc(p.id) + '" aria-label="Escolher o áudio de ' + esc(p.title) + '">Escolher áudio</button></div>';
+  }).join('');
+  return '<div class="pending"><h3>Esperando o áudio (' + names.length + ')</h3><p>Letras importadas de músicas que ainda não estão neste aparelho. Um áudio com o mesmo nome recebe a letra sozinho. Se o arquivo tem outro nome, toque em <b>Escolher áudio</b>.</p>' +
+    rows + '<button class="btn ghost" data-act="droppending">Descartar estas letras</button></div>';
 }
 function cleanLyrics(arr){
   if (!Array.isArray(arr)) return [];
@@ -1356,12 +1359,14 @@ async function importData(text){
   render(); if (playerOpen) renderPlayer(); else renderMini();
   toast('Dados importados');
 }
-async function applyPending(song){
+async function applyPending(song, forced){
   var k = normTitle(song.title), changed = false;
-  var p = state.pending.find(function(x){ return x.id === k; });
+  var p = forced || state.pending.find(function(x){ return x.id === k; });
+  if (p) k = normTitle(p.title);
   if (p) {
     song.title = p.title; song.lyrics = p.lyrics || []; song.notes = p.notes || ''; song.parts = p.parts || [];
-    if (p.transpose) song.transpose = p.transpose;
+    if (p.transpose) song.transpose = p.transpose; else delete song.transpose;
+    if (!song.duration && p.duration) song.duration = p.duration;
     await save('songs', song);
     state.pending = state.pending.filter(function(x){ return x !== p; });
     await remove('pending', p.id);
@@ -1373,7 +1378,7 @@ async function applyPending(song){
     if (!hit) continue;
     /* pos é a posição na ordem completa; descontar as que ainda esperam antes dela */
     var before = w.filter(function(x){ return x !== hit && x.pos < hit.pos; }).length;
-    pl.songIds.splice(Math.min(hit.pos - before, pl.songIds.length), 0, song.id);
+    if (pl.songIds.indexOf(song.id) < 0) pl.songIds.splice(Math.min(hit.pos - before, pl.songIds.length), 0, song.id);
     pl.pendingTitles = w.filter(function(x){ return x !== hit; });
     if (!pl.pendingTitles.length) delete pl.pendingTitles;
     await save('playlists', pl);
@@ -1388,26 +1393,109 @@ $('#dataFile').addEventListener('change', async function(e){
 });
 
 /* ---------- Ações ---------- */
+/* Guarda um arquivo de áudio como música nova (o espaço já foi conferido por quem chama) */
+async function storeAudioFile(f){
+  var id = uid();
+  try {
+    var buf = await f.arrayBuffer();
+    var title = f.name.replace(/\.[^.]+$/, '').replace(/_+/g, ' ').trim() || 'Sem título';
+    var song = { id:id, title:title, lyrics:[], duration:null, added:Date.now(), size:buf.byteLength };
+    var rec = { id:id, buf:buf, type:f.type || 'audio/mpeg' };
+    if (db) await save('audio', rec); else mem.audio.set(id, rec);
+    song.duration = await probeDuration(buf, rec.type);
+    await save('songs', song);
+    state.songs.push(song);
+    return song;
+  } catch(err) {
+    try { await remove('audio', id); } catch(_){}
+    toast('Sem espaço para guardar “' + f.name + '”');
+    return null;
+  }
+}
+/* Duração de um áudio sem tocar (null se o navegador não souber ler) */
+function probeDuration(buf, type){
+  return new Promise(function(res){
+    var url = URL.createObjectURL(new Blob([buf], { type:type })), a = new Audio(), done = false;
+    function end(v){ if (done) return; done = true; URL.revokeObjectURL(url); a.removeAttribute('src'); res(v); }
+    a.preload = 'metadata';
+    a.onloadedmetadata = function(){ end(isFinite(a.duration) ? a.duration : null); };
+    a.onerror = function(){ end(null); };
+    setTimeout(function(){ end(null); }, 8000);
+    a.src = url;
+  });
+}
+function hasContent(s){ return !!(s.lyrics.length || s.notes || (s.parts && s.parts.length)); }
+/* Escolher o áudio de uma letra que está esperando, com qualquer nome de arquivo */
+var linkTarget = null;
+function chooseAudioFor(pid){
+  var p = state.pending.find(function(x){ return x.id === pid; }); if (!p) return;
+  if (freeBytes() < 1048576) { toast('O espaço de ' + fmtSize(STORAGE_LIMIT) + ' do Ensaio está cheio. Exclua músicas que saíram do repertório.', 6000); return; }
+  linkTarget = p; $('#linkFile').value = ''; $('#linkFile').click();
+}
+$('#linkFile').addEventListener('change', async function(e){
+  var f = e.target.files[0], p = linkTarget; e.target.value = ''; linkTarget = null;
+  if (!f || !p || state.pending.indexOf(p) < 0) return;
+  if (usedBytes() + f.size > STORAGE_LIMIT) { toast('“' + f.name + '” não coube no limite de ' + fmtSize(STORAGE_LIMIT) + ' (faltam ' + fmtSize(freeBytes()) + ')', 6000); return; }
+  toast('Guardando “' + f.name + '”…');
+  var song = await storeAudioFile(f); if (!song) return;
+  try { await applyPending(song, p); } catch(err){ toast('O áudio foi guardado, mas a letra não pôde ser ligada'); render(); return; }
+  render();
+  toast('Letra de “' + song.title + '” ligada a “' + f.name + '”', 3500);
+});
+/* Ligar uma letra que está esperando a uma música que já está no aparelho */
+function useImportedLyrics(s){
+  if (!state.pending.length) { toast('Não há letras importadas esperando'); return; }
+  actionSheet('Usar qual letra em “' + s.title + '”?', state.pending.slice().sort(function(a,b){ return a.title.localeCompare(b.title, 'pt-BR'); }).map(function(p){
+    return { label:p.title, fn:async function(){
+      if (hasContent(s) && !(await confirmBox('O que “' + s.title + '” tem hoje (letra, observações e partes) será substituído pela letra importada de “' + p.title + '”.', 'Substituir'))) return;
+      if (curSong() === s) { if (state.sync) finishSync(true); if (state.adjust) finishAdjust(true); }
+      s.lyrics = []; s.notes = ''; s.parts = [];
+      try { await applyPending(s, p); } catch(err){ toast('Não foi possível ligar a letra'); return; }
+      render(); if (curSong() === s) { renderPlayer(); updateMediaSession(); }
+      toast('“' + s.title + '” recebeu a letra importada', 3000);
+    } };
+  }));
+}
+/* Trocar o áudio de uma música, mantendo letra, cifras, partes, marcas e playlists */
+var swapTarget = null;
+function swapAudio(s){ swapTarget = s; $('#swapFile').value = ''; $('#swapFile').click(); }
+$('#swapFile').addEventListener('change', async function(e){
+  var f = e.target.files[0], s = swapTarget; e.target.value = ''; swapTarget = null;
+  if (!f || !s || state.songs.indexOf(s) < 0) return;
+  if (usedBytes() - (s.size || 0) + f.size > STORAGE_LIMIT) { toast('“' + f.name + '” não cabe no limite de ' + fmtSize(STORAGE_LIMIT) + '. Exclua músicas que saíram do repertório.', 6000); return; }
+  toast('Trocando o áudio…');
+  var buf, rec, dur;
+  try {
+    buf = await f.arrayBuffer(); rec = { id:s.id, buf:buf, type:f.type || 'audio/mpeg' };
+    dur = await probeDuration(buf, rec.type);
+    if (db) await save('audio', rec); else mem.audio.set(s.id, rec);
+  } catch(err) { toast('Sem espaço para guardar “' + f.name + '”'); return; }
+  var old = s.duration;
+  s.size = buf.byteLength; s.duration = dur || null;
+  await saveSong(s);
+  if (curSong() === s) {
+    if (state.sync) finishSync(true); if (state.adjust) finishAdjust(true);
+    if (curUrl) URL.revokeObjectURL(curUrl);
+    curUrl = URL.createObjectURL(new Blob([buf], { type:rec.type }));
+    audio.src = curUrl; applyRate();
+    state.loopA = state.loopB = null; state.loopPart = null; lastPart = -2; lastActive = -2;
+    renderPlayer(); setPlayIcons();
+  }
+  render();
+  var timed = s.lyrics.some(function(l){ return l.t != null; }) || (s.parts && s.parts.length);
+  if (timed && old && dur && Math.abs(dur - old) > 2) toast('Áudio trocado. A duração mudou (' + fmt(old) + ' → ' + fmt(dur) + '): confira os tempos em Sincronizar → Ajustar tempos.', 7000);
+  else toast('Áudio de “' + s.title + '” trocado. Letra, partes e anotações mantidas.', 3500);
+});
 async function addFiles(files){
   var added = 0, restored = 0, skipped = [];
   for (var i = 0; i < files.length; i++) {
-    var f = files[i], id = uid();
+    var f = files[i];
     if (usedBytes() + f.size > STORAGE_LIMIT) { skipped.push(f.name); continue; }
     toast('Guardando ' + (i+1) + ' de ' + files.length + '…');
-    try {
-      var buf = await f.arrayBuffer();
-      var title = f.name.replace(/\.[^.]+$/, '').replace(/_+/g, ' ').trim() || 'Sem título';
-      var song = { id:id, title:title, lyrics:[], duration:null, added:Date.now(), size:buf.byteLength };
-      if (db) await save('audio', { id:id, buf:buf, type:f.type || 'audio/mpeg' });
-      else mem.audio.set(id, { id:id, buf:buf, type:f.type || 'audio/mpeg' });
-      await save('songs', song);
-      state.songs.push(song); added++;
-      try { if (await applyPending(song)) restored++; } catch(e){}
-    } catch(err) {
-      await remove('audio', id);
-      toast('Sem espaço para guardar “' + f.name + '”');
-      await new Promise(function(r){ setTimeout(r, 1500); });
-    }
+    var song = await storeAudioFile(f);
+    if (!song) { await new Promise(function(r){ setTimeout(r, 1500); }); continue; }
+    added++;
+    try { if (await applyPending(song)) restored++; } catch(e){}
   }
   var msg = [];
   if (added) msg.push((added === 1 ? 'Música adicionada' : added + ' músicas adicionadas') +
@@ -1429,10 +1517,12 @@ function songMenu(id){
     { label:'Editar letra', fn:function(){ lyricsEditor(s); } },
     { label: s.notes ? 'Editar observações' : 'Adicionar observações', fn:function(){ notesEditor(s); } },
     { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } },
-    { label:'Adicionar a uma playlist', fn:function(){ addToPlaylistMenu(s); } },
+    { label:'Adicionar a uma playlist', fn:function(){ addToPlaylistMenu(s); } }
+  ].concat(state.pending.length ? [{ label:'Usar letra importada…', fn:function(){ useImportedLyrics(s); } }] : []).concat([
+    { label:'Trocar o áudio…', fn:function(){ swapAudio(s); } },
     { label:'Renomear', fn:async function(){ var n = await askText('Renomear música', s.title, 'Salvar'); if (n) { s.title = n; await save('songs', s); render(); renderPlayerHead(); updateMediaSession(); } } },
     { label:'Excluir do aparelho', danger:true, fn:async function(){ if (await confirmBox('Excluir “' + s.title + '”? O áudio e a letra serão apagados deste aparelho.', 'Excluir')) deleteSong(id); } }
-  ]);
+  ]));
 }
 async function newPlaylist(ids){
   var name = await askText('Nova playlist', '', 'Criar playlist'); if (!name) return null;
@@ -1485,6 +1575,7 @@ document.addEventListener('click', async function(e){
     case 'theme': themeMenu(); break;
     case 'install': doInstall(); break;
     case 'pedal': pedalSheet(); break;
+    case 'pendaudio': chooseAudioFor(id); break;
     case 'stage': if (curSong()) enterStage(); else toast('Toque uma música primeiro'); break;
     case 'tutorial': e.preventDefault(); openTutorial(); break;
     case 'import': $('#dataFile').value = ''; $('#dataFile').click(); break;
@@ -1544,7 +1635,9 @@ $('#pEdit').onclick = function(){
      { label:'Tom: transpor' + (s.transpose ? ' (' + (s.transpose > 0 ? '+' : '−') + Math.abs(s.transpose) + ')' : ''), fn:function(){ transposeSheet(s); } },
      { label: chordsOn() ? 'Esconder cifras' : 'Mostrar cifras', fn:toggleChords }
    ] : [])
-   .concat([{ label:'Cores do marca-texto', fn:markNamesEditor }, { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }]));
+   .concat([{ label:'Cores do marca-texto', fn:markNamesEditor }, { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }])
+   .concat(state.pending.length ? [{ label:'Usar letra importada…', fn:function(){ useImportedLyrics(s); } }] : [])
+   .concat([{ label:'Trocar o áudio…', fn:function(){ swapAudio(s); } }]));
 };
 $('#pNotes').onclick = function(){ if (curSong()) notesEditor(curSong()); };
 $('#mkLegend').onclick = markNamesEditor;
