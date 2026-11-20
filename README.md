@@ -1,6 +1,6 @@
 # 🎙️ Ensaio 🎙️
 
-Player de música para o celular, feito para estudar repertório: toque seus arquivos de áudio, acompanhe a letra sincronizada (com cifras), repita ou desacelere os trechos difíceis e leve o repertório para o palco.
+Player de música para o celular, feito para estudar repertório: toque seus arquivos de áudio, acompanhe a letra sincronizada (com cifras), repita ou desacelere os trechos difíceis e leve o repertório para o palco. Pensado também para coros: kits de naipe, notas iniciais e um pacote de ensaio que o regente manda pronto para o coro.
 
 Tudo roda no navegador, sem build nem dependências. Nenhuma música, letra ou anotação sai do seu aparelho.
 
@@ -50,13 +50,13 @@ Tudo roda no navegador, sem build nem dependências. Nenhuma música, letra ou a
 
 ### No palco
 
-- **Modo palco**: tela cheia só com a letra bem grande (com cifras e marca-texto), a posição na fila e a próxima música no alto. Toque na letra para mostrar os controles; toque nas bordas para trocar de música, que fica pronta, sem tocar, para a banda entrar junto. Tocar ou segurar um verso não faz nada, para evitar toques sem querer, e a tela fica acesa mesmo com a música parada
-- **Pedal de virar página (Bluetooth) e teclado**: os dois botões do pedal podem ir de parte em parte, tocar/pausar ou trocar de música. Atalhos: Espaço (tocar/pausar), ← → (5 s), Shift + ← → ou P/N (música), L (repetir a parte), F (modo palco) e ? (lista de atalhos)
+- **Modo palco**: tela cheia só com a letra bem grande (com cifras e marca-texto), a posição na fila e a próxima música no alto. Toque na letra para mostrar os controles; toque nas bordas para trocar de música, que fica pronta, sem tocar, para a banda entrar junto. O diapasão (notas iniciais) e a versão do naipe também aparecem no alto. Tocar ou segurar um verso não faz nada, para evitar toques sem querer, e a tela fica acesa mesmo com a música parada
+- **Pedal de virar página (Bluetooth) e teclado**: os dois botões do pedal podem ir de parte em parte, tocar/pausar ou trocar de música. Atalhos: Espaço (tocar/pausar), ← → (5 s), Shift + ← → ou P/N (música), L (repetir a parte), V (próxima versão/naipe), F (modo palco) e ? (lista de atalhos)
 
 ### Para o regente
 
 - **Pacote de ensaio**: em **Opções** da playlist, **Enviar pacote de ensaio (com áudios)…** gera um .zip com tudo (letra sincronizada, partes, cifras, marca-texto, anotações, notas iniciais, versões por naipe e os áudios). O coralista abre em **Importar dados** e recebe a playlist pronta. Reenviar um pacote atualizado substitui, sem duplicar
-- **Notas iniciais por naipe**: a nota de partida de cada naipe (ou de todos, em uníssono). O ícone de diapasão no player toca a minha nota (Meu naipe), todas uma a uma e o acorde
+- **Notas iniciais por naipe**: a nota de partida de cada naipe (ou de todos, em uníssono). O ícone de diapasão no player e no modo palco toca a minha nota (Meu naipe), todas uma a uma e o acorde, ou a de cada naipe; dá para ouvir cada nota antes de salvar
 - **Anotações por naipe** no verso (“Tenor: respirar aqui”): cada coralista vê a do seu naipe destacada e pode esconder as dos outros
 
 ### Anotações
@@ -89,6 +89,8 @@ Atalhos para o dia a dia:
 - **Palavra ou acorde errado:** segure o verso.
 - **Estudar a sua voz no kit do coral:** adicione todos os arquivos do kit de uma vez, toque em **Agrupar** e escolha **Meu naipe** em **⋯ → Versões (naipe)…**.
 - **Mandar o repertório para o coro:** playlist → **Opções** → **Enviar pacote de ensaio**. O coro importa em **Importar dados**.
+- **Dar o tom antes de começar:** **Letra → Notas iniciais por naipe…** e depois o ícone de diapasão no alto do player.
+- **Avisar só um naipe:** segure o verso → **+ Anotação para um naipe**.
 - **Ensaiar só o refrão:** marque as partes com **+ Parte** e segure a parte → **Repetir esta parte**.
 - **Tocar ao vivo:** ícone de tela cheia ao lado de **Letra** (modo palco). Pareie o pedal e escolha o que ele faz em **Ajuda → Pedal e teclado**.
 
@@ -117,7 +119,7 @@ Se mudar uma tela do app, vale refazer o print correspondente em `img/tutorial/`
 
 ## Onde ficam os dados
 
-Músicas, letras, anotações e playlists ficam no IndexedDB do navegador, no aparelho e no endereço onde foram criadas. As preferências do aparelho (tema, músicas por página, “ao terminar”, cifras visíveis, nomes das cores, pedal e meu naipe) ficam no `localStorage`.
+Músicas, letras, anotações e playlists ficam no IndexedDB do navegador, no aparelho e no endereço onde foram criadas. As preferências do aparelho (tema, músicas por página, “ao terminar”, cifras visíveis, nomes das cores, pedal, meu naipe e anotações de outros naipes visíveis ou não) ficam no `localStorage`.
 
 O app limita os áudios a 1 GB (cerca de 100 a 200 músicas em MP3), já que é feito para o repertório em ensaio, não para guardar uma coleção. O fim da aba Músicas mostra quanto foi usado e quanto falta; músicas que passariam do limite não são adicionadas. O limite fica na constante `STORAGE_LIMIT` em `js/app.js`.
 
