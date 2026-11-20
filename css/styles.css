@@ -199,6 +199,23 @@ textarea.field.ln-ta{min-height:5.5rem}
 .kb dt{font-weight:700;white-space:nowrap}
 .kb dd{margin:0;color:var(--muted)}
 .pl-dur{color:var(--muted);font-size:.88rem;margin:0 6px 6px}
+/* Versões por naipe */
+.versions{display:flex;gap:6px;overflow-x:auto;padding:0 16px 8px;scrollbar-width:none}
+.versions::-webkit-scrollbar{display:none}
+.ver-chip{flex:none;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 14px;font-weight:700;font-size:.88rem;min-height:36px}
+.ver-chip.on{background:var(--btn);color:var(--btn-ink);border-color:transparent}
+.ver-chip.edit{color:var(--muted);padding:6px 12px}
+.player.stage .versions{display:none}
+.ver-list{margin:0 0 12px}
+.ver-row{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid var(--line)}
+.ver-row:last-child{border-bottom:1px solid var(--line)}
+.vr-t{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.vr-t span{font-size:.85rem;color:var(--muted)}
+.vr-me{font-style:normal;background:var(--btn);color:var(--btn-ink);border-radius:999px;padding:1px 8px;font-size:.72rem;margin-left:6px;vertical-align:1px}
+.naipe-l{display:flex;align-items:center;gap:10px;font-weight:700;margin:16px 0 4px}
+.naipe-l select{font:inherit;font-weight:400;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--text);min-height:40px}
+.kit-list{margin:0 0 10px;padding-left:1.2em;line-height:1.5}
+.kit-list span{color:var(--muted);font-size:.88rem}
 .parts{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding:0 16px}
 .parts::-webkit-scrollbar{display:none}
 .part-chip{flex:none;display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:.86rem;font-weight:700;min-height:36px;scroll-snap-align:start;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:pan-x}

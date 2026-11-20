@@ -81,7 +81,7 @@ function lyricStatus(s){
   if (!s.lyrics.length) return 'sem letra';
   return s.lyrics.some(function(l){ return l.t != null; }) ? 'letra sincronizada' : 'letra sem tempos';
 }
-function songSub(s){ return (s.duration ? fmt(s.duration) + ', ' : '') + lyricStatus(s) + (s.notes || s.lyrics.some(function(l){ return l.note; }) ? ', com observações' : ''); }
+function songSub(s){ return (s.duration ? fmt(s.duration) + ', ' : '') + (hasVersions(s) ? s.versions.length + ' versões, ' : '') + lyricStatus(s) + (s.notes || s.lyrics.some(function(l){ return l.note; }) ? ', com observações' : ''); }
 
 /* ---------- Letras ---------- */
 var STAMP_RE = /^\s*\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/;
@@ -445,7 +445,11 @@ function renderLibList(){
 
 /* Limite de espaço do próprio app: soma dos áudios guardados */
 var STORAGE_LIMIT = 1024 * 1048576; /* 1 GB */
-function usedBytes(){ return state.songs.reduce(function(n, s){ return n + (s.size || 0); }, 0); }
+function usedBytes(){
+  return state.songs.reduce(function(n, s){
+    return n + (s.size || 0) + (s.versions || []).reduce(function(m, v){ return m + (v.id !== s.id ? (v.size || 0) : 0); }, 0);
+  }, 0);
+}
 function freeBytes(){ return Math.max(0, STORAGE_LIMIT - usedBytes()); }
 function fmtSize(b){
   if (b >= 1024 * 1048576 * 0.995) return String(+(b / (1024 * 1048576)).toFixed(1)).replace('.', ',') + ' GB';
@@ -495,7 +499,7 @@ function renderPlayerHead(){
   $('#pTitle').textContent = s ? s.title : 'Nada tocando';
   $('#pSub').textContent = s ? (state.qi+1) + ' de ' + state.queue.length + ', ' + state.queueName : '';
 }
-function renderPlayer(){ renderPlayerHead(); renderNotes(); renderLyrics(); renderTools(); setPlayIcons(); renderStage(); }
+function renderPlayer(){ renderPlayerHead(); renderVersions(); renderNotes(); renderLyrics(); renderTools(); setPlayIcons(); renderStage(); }
 
 /* ---------- Partes da música (Intro, Verso, Refrão…) ---------- */
 var PART_NAMES = ['Intro', 'Verso', 'Pré-refrão', 'Refrão', 'Ponte', 'Solo', 'Final'];
@@ -705,7 +709,9 @@ async function playAt(i, noPlay){
   if (state.adjust) finishAdjust(true);
   state.qi = i;
   var s = curSong();
-  var a = await loadAudio(s.id);
+  state.vid = pickVersion(s);
+  var a = await loadAudio(state.vid);
+  if (!a && state.vid !== s.id) { state.vid = s.id; a = await loadAudio(s.id); }
   if (!a) { toast('O áudio de “' + s.title + '” não foi encontrado'); return; }
   if (curUrl) URL.revokeObjectURL(curUrl);
   curUrl = URL.createObjectURL(new Blob([a.buf], {type: a.type}));
@@ -799,7 +805,8 @@ document.addEventListener('visibilitychange', function(){ if (document.visibilit
 function updateMediaSession(){
   if (!('mediaSession' in navigator)) return;
   var s = curSong(); if (!s) return;
-  try { navigator.mediaSession.metadata = new MediaMetadata({ title: s.title, artist: state.queueName || 'Ensaio' }); } catch(e){}
+  var v = hasVersions(s) ? curVersion() : null;
+  try { navigator.mediaSession.metadata = new MediaMetadata({ title: s.title + (v ? ' (' + v.name + ')' : ''), artist: state.queueName || 'Ensaio' }); } catch(e){}
 }
 if ('mediaSession' in navigator) {
   var h = { play: function(){ audio.play().catch(function(){}); }, pause: function(){ audio.pause(); },
@@ -1225,7 +1232,9 @@ function cleanParts(arr){
 function cleanTranspose(n){ n = Math.round(+n); return isFinite(n) && n >= -11 && n <= 11 ? n : 0; }
 function buildExport(){
   var songs = state.songs.map(function(s){
-    return { title:s.title, notes:s.notes || '', duration:s.duration || null, lyrics:cleanLyrics(s.lyrics), parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose) };
+    var o = { title:s.title, notes:s.notes || '', duration:s.duration || null, lyrics:cleanLyrics(s.lyrics), parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose) };
+    if (hasVersions(s)) o.versions = s.versions.map(function(v){ return v.name; });
+    return o;
   }).concat(state.pending.map(function(p){
     return { title:p.title, notes:p.notes || '', duration:p.duration || null, lyrics:cleanLyrics(p.lyrics), parts:cleanParts(p.parts), transpose:cleanTranspose(p.transpose) };
   }));
@@ -1456,24 +1465,229 @@ function useImportedLyrics(s){
     } };
   }));
 }
-/* Trocar o áudio de uma música, mantendo letra, cifras, partes, marcas e playlists */
-var swapTarget = null;
-function swapAudio(s){ swapTarget = s; $('#swapFile').value = ''; $('#swapFile').click(); }
-$('#swapFile').addEventListener('change', async function(e){
-  var f = e.target.files[0], s = swapTarget; e.target.value = ''; swapTarget = null;
+/* ---------- Versões por naipe (kits do coral): várias gravações da mesma música ---------- */
+/* O áudio principal fica com o id da música; as outras versões têm id próprio no banco 'audio' */
+var NAIPE_RANK = ['tutti','todos','coro','completo','original','soprano','mezzo','contralto','tenor','baritono','baixo','piano','acompanhamento','playback','instrumental'];
+var NAIPE_NAMES = ['Tutti','Soprano','Mezzo','Contralto','Tenor','Barítono','Baixo','Piano'];
+var NAIPE_TOKEN = '(tutti|todos|coro|completo|soprano|mezzo(?:[ -]?soprano)?|contralto|alto|tenor|bar[ií]tono|baixo|bass|piano|acompanhamento|playback|instrumental)(?:[ -]?(\\d))?';
+function versionsOf(s){ return s && s.versions && s.versions.length ? s.versions : [{ id:s.id, name:'Original', size:s.size, duration:s.duration }]; }
+function hasVersions(s){ return !!(s && s.versions && s.versions.length > 1); }
+function vDuration(s, v){ return v.id === s.id ? s.duration : v.duration; }
+function curVersion(){ var s = curSong(); if (!s) return null; var vs = versionsOf(s); return vs.find(function(v){ return v.id === state.vid; }) || vs[0]; }
+function myNaipe(){ try { return localStorage.getItem('ensaio-naipe') || ''; } catch(e){ return ''; } }
+function naipeKey(name){
+  var n = normTitle(name).replace(/[\s-]*\d+$/, '');
+  if (n === 'alto') n = 'contralto'; if (n === 'bass') n = 'baixo'; if (/^mezzo/.test(n)) n = 'mezzo';
+  return n;
+}
+function naipeRank(name){ var k = NAIPE_RANK.indexOf(naipeKey(name)); return k < 0 ? 99 : k; }
+function pickVersion(s){
+  var vs = versionsOf(s), my = myNaipe();
+  if (my && hasVersions(s)) { var v = vs.find(function(x){ return naipeKey(x.name) === naipeKey(my); }); if (v) return v.id; }
+  return vs[0].id;
+}
+function prettyNaipe(w){
+  var n = normTitle(w);
+  if (/^mezzo/.test(n)) return 'Mezzo';
+  return { tutti:'Tutti', todos:'Todos', coro:'Coro', completo:'Completo', soprano:'Soprano', contralto:'Contralto', alto:'Contralto', tenor:'Tenor', baritono:'Barítono', baixo:'Baixo', bass:'Baixo',
+    piano:'Piano', acompanhamento:'Acompanhamento', playback:'Playback', instrumental:'Instrumental' }[n] || w;
+}
+/* "Ave Maria - Soprano.mp3", "Ave Maria (Tenor 2).mp3", "Ave_Maria_Baixo.mp3", "Contralto - Ave Maria.mp3" */
+function splitNaipe(fileName){
+  var raw = fileName.replace(/\.[^.]+$/, '').replace(/_+/g, ' ').replace(/\s+/g, ' ').trim();
+  var m = new RegExp('^(.*?)[\\s\\-–(\\[]+' + NAIPE_TOKEN + '[)\\]]?$', 'i').exec(raw);
+  if (m && m[1].replace(/[\s\-–(\[]+$/, '').trim()) return { base:m[1].replace(/[\s\-–(\[]+$/, '').trim(), naipe:prettyNaipe(m[2]) + (m[3] ? ' ' + m[3] : '') };
+  m = new RegExp('^(?:[(\\[]' + NAIPE_TOKEN + '[)\\]]\\s*|' + NAIPE_TOKEN + '\\s*[-–]\\s*)(.+)$', 'i').exec(raw);
+  if (m && m[5].trim()) { var w = m[1] || m[3], d = m[2] || m[4]; return { base:m[5].trim(), naipe:prettyNaipe(w) + (d ? ' ' + d : '') }; }
+  return { base:raw, naipe:null };
+}
+function uniqueVersionName(s, base, except){
+  var names = versionsOf(s).filter(function(v){ return v !== except; }).map(function(v){ return normTitle(v.name); });
+  if (names.indexOf(normTitle(base)) < 0) return base;
+  for (var n = 2; ; n++) if (names.indexOf(normTitle(base + ' ' + n)) < 0) return base + ' ' + n;
+}
+function sortVersions(s){
+  var vs = versionsOf(s), main = vs[0];
+  s.versions = [main].concat(vs.slice(1).sort(function(a, b){ return naipeRank(a.name) - naipeRank(b.name) || a.name.localeCompare(b.name, 'pt-BR'); }));
+}
+/* Guarda um arquivo como nova versão de uma música que já existe */
+async function storeVersionFile(s, f, name){
+  var id = uid();
+  try {
+    var buf = await f.arrayBuffer(), rec = { id:id, buf:buf, type:f.type || 'audio/mpeg' };
+    if (db) await save('audio', rec); else mem.audio.set(id, rec);
+    var v = { id:id, name:uniqueVersionName(s, name || 'Versão'), size:buf.byteLength, duration:await probeDuration(buf, rec.type) };
+    s.versions = versionsOf(s).concat([v]); sortVersions(s);
+    await save('songs', s);
+    return v;
+  } catch(err) {
+    try { await remove('audio', id); } catch(_){}
+    toast('Sem espaço para guardar “' + f.name + '”');
+    return null;
+  }
+}
+function renderVersions(){
+  var s = curSong(), box = $('#versions');
+  if (!s || !hasVersions(s)) { box.hidden = true; box.innerHTML = ''; return; }
+  var cur = curVersion();
+  box.hidden = false;
+  box.innerHTML = versionsOf(s).map(function(v){
+    var on = v.id === cur.id;
+    return '<button class="ver-chip' + (on ? ' on' : '') + '" data-vid="' + v.id + '" aria-pressed="' + on + '">' + esc(v.name) + '</button>';
+  }).join('') + '<button class="ver-chip edit" data-vedit="1" aria-label="Versões e meu naipe">⋯</button>';
+}
+async function switchVersion(vid){
+  var s = curSong(); if (!s) return;
+  var v = versionsOf(s).find(function(x){ return x.id === vid; }); if (!v) return;
+  if (vid === state.vid && audio.src) return;
+  var a = await loadAudio(vid); if (!a) { toast('O áudio desta versão não foi encontrado'); return; }
+  var t = audio.currentTime || 0, playing = !audio.paused;
+  state.vid = vid;
+  if (curUrl) URL.revokeObjectURL(curUrl);
+  curUrl = URL.createObjectURL(new Blob([a.buf], { type:a.type }));
+  audio.src = curUrl; applyRate();
+  await new Promise(function(res){
+    var done = false;
+    function ok(){ if (done) return; done = true; audio.removeEventListener('loadedmetadata', ok); res(); }
+    audio.addEventListener('loadedmetadata', ok); setTimeout(ok, 3000);
+  });
+  try { audio.currentTime = Math.max(0, Math.min(t, (audio.duration || t + 1) - 0.2)); } catch(e){}
+  if (playing) audio.play().catch(function(){});
+  lastActive = -2; lastPart = -2;
+  renderVersions(); renderStage(); updateMediaSession(); setPlayIcons();
+  var timed = s.lyrics.some(function(l){ return l.t != null; }) || (s.parts && s.parts.length);
+  var d = vDuration(s, v), d0 = s.duration;
+  if (timed && d && d0 && Math.abs(d - d0) > 2) toast(v.name + ': esta versão tem outra duração, os tempos da letra podem não bater', 4000);
+  else toast(v.name, 1200);
+}
+function cycleVersion(){
+  var s = curSong(); if (!hasVersions(s)) return;
+  var vs = versionsOf(s), k = vs.indexOf(curVersion());
+  switchVersion(vs[(k + 1) % vs.length].id);
+}
+function chooseVersionName(s, title, except, suggest, done){
+  var names = (suggest && NAIPE_NAMES.indexOf(suggest) < 0 ? [suggest] : []).concat(NAIPE_NAMES);
+  actionSheet(title, names.map(function(n){ return { label:n + (n === suggest ? '  (do nome do arquivo)' : ''), fn:function(){ done(uniqueVersionName(s, n, except)); } }; }).concat([
+    { label:'Outro nome…', fn:async function(){ var n = await askText('Nome da versão', except ? except.name : '', 'Salvar'); if (n && n.trim()) done(uniqueVersionName(s, n.trim().slice(0, 30), except)); } }
+  ]));
+}
+var verTarget = null;
+function addVersion(s){
+  if (freeBytes() < 1048576) { toast('O espaço de ' + fmtSize(STORAGE_LIMIT) + ' do Ensaio está cheio.', 5000); return; }
+  verTarget = s; $('#verFile').value = ''; $('#verFile').click();
+}
+$('#verFile').addEventListener('change', function(e){
+  var f = e.target.files[0], s = verTarget; e.target.value = ''; verTarget = null;
   if (!f || !s || state.songs.indexOf(s) < 0) return;
-  if (usedBytes() - (s.size || 0) + f.size > STORAGE_LIMIT) { toast('“' + f.name + '” não cabe no limite de ' + fmtSize(STORAGE_LIMIT) + '. Exclua músicas que saíram do repertório.', 6000); return; }
+  if (usedBytes() + f.size > STORAGE_LIMIT) { toast('“' + f.name + '” não coube no limite de ' + fmtSize(STORAGE_LIMIT) + ' (faltam ' + fmtSize(freeBytes()) + ')', 6000); return; }
+  chooseVersionName(s, 'Nome desta versão', null, splitNaipe(f.name).naipe, async function(name){
+    toast('Guardando “' + f.name + '”…');
+    var v = await storeVersionFile(s, f, name); if (!v) return;
+    if (curSong() === s) renderVersions();
+    render(); toast('Versão “' + v.name + '” adicionada', 2500);
+    versionsSheet(s);
+  });
+});
+async function removeVersion(s, v){
+  var vs = versionsOf(s); if (vs.length < 2) return;
+  if (!(await confirmBox('Apagar a versão “' + v.name + '”? O áudio dela sai do aparelho; a letra, as partes e as anotações continuam.', 'Apagar'))) return;
+  var playingThis = curSong() === s && curVersion().id === v.id;
+  if (v.id === s.id) {
+    /* a principal guarda o áudio com o id da música: a próxima versão passa para o lugar dela */
+    var next = vs[1], a = await loadAudio(next.id);
+    if (!a) { toast('Não foi possível apagar esta versão'); return; }
+    var rec = { id:s.id, buf:a.buf, type:a.type };
+    if (db) await save('audio', rec); else mem.audio.set(s.id, rec);
+    await remove('audio', next.id); mem.audio.delete(next.id);
+    s.size = next.size; s.duration = next.duration;
+    s.versions = [{ id:s.id, name:next.name, size:next.size, duration:next.duration }].concat(vs.slice(2));
+    if (state.vid === next.id) state.vid = s.id;
+  } else {
+    await remove('audio', v.id); mem.audio.delete(v.id);
+    s.versions = vs.filter(function(x){ return x !== v; });
+  }
+  await saveSong(s);
+  if (playingThis) { state.vid = null; await switchVersion(versionsOf(s)[0].id); }
+  else if (curSong() === s) renderVersions();
+  render(); toast('Versão apagada'); versionsSheet(s);
+}
+function versionMenu(s, v){
+  var acts = [];
+  if (curSong() === s && curVersion().id !== v.id) acts.push({ label:'Tocar esta versão', fn:function(){ switchVersion(v.id); } });
+  acts.push({ label:'Renomear', fn:function(){ chooseVersionName(s, 'Renomear “' + v.name + '”', v, null, async function(n){ v.name = n; sortVersions(s); await saveSong(s); if (curSong() === s) { renderVersions(); updateMediaSession(); } versionsSheet(s); }); } });
+  acts.push({ label:'Trocar o áudio…', fn:function(){ swapAudio(s, v); } });
+  if (versionsOf(s).length > 1) acts.push({ label:'Apagar versão', danger:true, fn:function(){ removeVersion(s, v); } });
+  actionSheet(v.name, acts);
+}
+function versionsSheet(s){
+  function body(){
+    var vs = versionsOf(s), my = myNaipe(), cur = curSong() === s ? curVersion() : null;
+    return '<h2>Versões de “' + esc(s.title) + '”</h2>' +
+      '<p>Gravações da mesma música, como os kits de naipe do coral. A letra, as cifras, as partes e as anotações valem para todas.</p>' +
+      '<div class="ver-list">' + vs.map(function(v){
+        var d = vDuration(s, v), mine = my && hasVersions(s) && naipeKey(v.name) === naipeKey(my);
+        return '<div class="ver-row"><div class="vr-t"><b>' + esc(v.name) + (mine ? ' <em class="vr-me">meu naipe</em>' : '') + '</b>' +
+          '<span>' + (d ? fmt(d) : '—') + (cur && cur.id === v.id ? ' · tocando' : '') + '</span></div>' +
+          '<button class="icon-btn small" data-vmenu="' + v.id + '" aria-label="Opções da versão ' + esc(v.name) + '">' + ICON.more + '</button></div>';
+      }).join('') + '</div>' +
+      '<button class="btn sec" data-m="add">+ Adicionar versão</button>' +
+      '<label class="naipe-l">Meu naipe <select id="naipeSel">' + [''].concat(NAIPE_NAMES.slice(1, 7)).map(function(n){
+        return '<option value="' + n + '"' + (n === my ? ' selected' : '') + '>' + (n || 'Nenhum') + '</option>';
+      }).join('') + '</select></label>' +
+      '<p class="small">Com o naipe escolhido, as músicas com versões já abrem na sua voz. Vale para todas as músicas deste aparelho.</p>' +
+      '<div class="m-actions"><span class="grow"></span><button class="btn" data-m="x">Pronto</button></div>';
+  }
+  modal(body());
+  $('#sheet').onchange = function(e){
+    if (e.target.id !== 'naipeSel') return;
+    try { if (e.target.value) localStorage.setItem('ensaio-naipe', e.target.value); else localStorage.removeItem('ensaio-naipe'); } catch(_){}
+    toast(e.target.value ? 'Meu naipe: ' + e.target.value : 'Sem naipe escolhido');
+    $('#sheet').innerHTML = body();
+  };
+  $('#sheet').onclick = function(e){
+    var vm = e.target.closest('[data-vmenu]');
+    if (vm) { var v = versionsOf(s).find(function(x){ return x.id === vm.dataset.vmenu; }); if (v) versionMenu(s, v); return; }
+    var b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'add') { closeModal(); addVersion(s); return; }
+    closeModal();
+  };
+}
+/* Pergunta se os arquivos com naipe no nome devem virar versões */
+function askKits(kits){
+  return new Promise(function(res){
+    modal('<h2>Kits de naipe</h2><p>Estes arquivos parecem versões da mesma música:</p><ul class="kit-list">' + kits.map(function(g){
+      return '<li><b>' + esc(g.base) + '</b>: ' + esc(g.items.map(function(x){ return x.sp.naipe; }).join(', ')) + (g.song ? ' <span>(entram na música que já existe)</span>' : '') + '</li>';
+    }).join('') + '</ul><p class="small">Agrupadas, ficam como uma música só, com uma letra, e você troca de voz no player sem perder o ponto.</p>' +
+      '<div class="m-actions"><button class="btn sec" data-m="sep">Adicionar separadas</button><button class="btn" data-m="ok">Agrupar</button></div>', function(){ res(false); });
+    $('#sheet').onclick = function(e){ var b = e.target.closest('[data-m]'); if (!b) return; closeModal(); res(b.dataset.m === 'ok'); };
+  });
+}
+
+/* Trocar o áudio de uma música, mantendo letra, cifras, partes, marcas e playlists */
+var swapTarget = null, swapVer = null;
+function swapAudio(s, v){ swapTarget = s; swapVer = v || (curSong() === s ? curVersion() : versionsOf(s)[0]); $('#swapFile').value = ''; $('#swapFile').click(); }
+function swapAudioMenu(s){
+  if (!hasVersions(s)) { swapAudio(s); return; }
+  actionSheet('Trocar o áudio de qual versão?', versionsOf(s).map(function(v){ return { label:v.name, fn:function(){ swapAudio(s, v); } }; }));
+}
+$('#swapFile').addEventListener('change', async function(e){
+  var f = e.target.files[0], s = swapTarget, v = swapVer; e.target.value = ''; swapTarget = null; swapVer = null;
+  if (!f || !s || state.songs.indexOf(s) < 0) return;
+  v = versionsOf(s).find(function(x){ return v && x.id === v.id; }) || versionsOf(s)[0];
+  var isMain = v.id === s.id, vsize = isMain ? s.size : v.size;
+  if (usedBytes() - (vsize || 0) + f.size > STORAGE_LIMIT) { toast('“' + f.name + '” não cabe no limite de ' + fmtSize(STORAGE_LIMIT) + '. Exclua músicas que saíram do repertório.', 6000); return; }
   toast('Trocando o áudio…');
   var buf, rec, dur;
   try {
-    buf = await f.arrayBuffer(); rec = { id:s.id, buf:buf, type:f.type || 'audio/mpeg' };
+    buf = await f.arrayBuffer(); rec = { id:v.id, buf:buf, type:f.type || 'audio/mpeg' };
     dur = await probeDuration(buf, rec.type);
-    if (db) await save('audio', rec); else mem.audio.set(s.id, rec);
+    if (db) await save('audio', rec); else mem.audio.set(v.id, rec);
   } catch(err) { toast('Sem espaço para guardar “' + f.name + '”'); return; }
-  var old = s.duration;
-  s.size = buf.byteLength; s.duration = dur || null;
+  var old = vDuration(s, v);
+  if (isMain) { s.size = buf.byteLength; s.duration = dur || null; }
+  v.size = buf.byteLength; v.duration = dur || null;
   await saveSong(s);
-  if (curSong() === s) {
+  if (curSong() === s && curVersion().id === v.id) {
     if (state.sync) finishSync(true); if (state.adjust) finishAdjust(true);
     if (curUrl) URL.revokeObjectURL(curUrl);
     curUrl = URL.createObjectURL(new Blob([buf], { type:rec.type }));
@@ -1487,7 +1701,33 @@ $('#swapFile').addEventListener('change', async function(e){
   else toast('Áudio de “' + s.title + '” trocado. Letra, partes e anotações mantidas.', 3500);
 });
 async function addFiles(files){
-  var added = 0, restored = 0, skipped = [];
+  var added = 0, restored = 0, skipped = [], versAdded = 0;
+  /* Kits de naipe: arquivos com o naipe no nome e a mesma música */
+  var groups = {}, kits = [];
+  files.forEach(function(f){ var sp = splitNaipe(f.name); if (!sp.naipe) return; var k = normTitle(sp.base); (groups[k] = groups[k] || []).push({ f:f, sp:sp }); });
+  Object.keys(groups).forEach(function(k){
+    var song = state.songs.find(function(s){ return normTitle(s.title) === k; });
+    if (groups[k].length >= 2 || song) kits.push({ base:groups[k][0].sp.base, items:groups[k], song:song });
+  });
+  if (kits.length && await askKits(kits)) {
+    var inKit = [];
+    for (var g = 0; g < kits.length; g++) {
+      var kit = kits[g], song = kit.song;
+      kit.items.sort(function(a, b){ return naipeRank(a.sp.naipe) - naipeRank(b.sp.naipe); });
+      for (var j = 0; j < kit.items.length; j++) {
+        var it = kit.items[j]; inKit.push(it.f);
+        if (usedBytes() + it.f.size > STORAGE_LIMIT) { skipped.push(it.f.name); continue; }
+        toast('Guardando “' + it.f.name + '”…');
+        if (!song) {
+          song = await storeAudioFile(it.f); if (!song) continue;
+          song.title = kit.base; song.versions = [{ id:song.id, name:it.sp.naipe, size:song.size, duration:song.duration }];
+          await save('songs', song); added++;
+          try { if (await applyPending(song)) restored++; } catch(e){}
+        } else if (await storeVersionFile(song, it.f, it.sp.naipe)) versAdded++;
+      }
+    }
+    files = files.filter(function(f){ return inKit.indexOf(f) < 0; });
+  }
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     if (usedBytes() + f.size > STORAGE_LIMIT) { skipped.push(f.name); continue; }
@@ -1498,6 +1738,7 @@ async function addFiles(files){
     try { if (await applyPending(song)) restored++; } catch(e){}
   }
   var msg = [];
+  if (versAdded) msg.push(versAdded === 1 ? '1 versão adicionada' : versAdded + ' versões adicionadas');
   if (added) msg.push((added === 1 ? 'Música adicionada' : added + ' músicas adicionadas') +
     (restored ? (restored === 1 ? '. 1 recebeu a letra importada' : '. ' + restored + ' receberam a letra importada') : ''));
   if (skipped.length) msg.push((skipped.length === 1 ? '“' + skipped[0] + '” não coube' : skipped.length + ' músicas não couberam') +
@@ -1519,7 +1760,8 @@ function songMenu(id){
     { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } },
     { label:'Adicionar a uma playlist', fn:function(){ addToPlaylistMenu(s); } }
   ].concat(state.pending.length ? [{ label:'Usar letra importada…', fn:function(){ useImportedLyrics(s); } }] : []).concat([
-    { label:'Trocar o áudio…', fn:function(){ swapAudio(s); } },
+    { label: hasVersions(s) ? 'Versões (' + s.versions.length + ')…' : 'Versões (naipe)…', fn:function(){ versionsSheet(s); } },
+    { label:'Trocar o áudio…', fn:function(){ swapAudioMenu(s); } },
     { label:'Renomear', fn:async function(){ var n = await askText('Renomear música', s.title, 'Salvar'); if (n) { s.title = n; await save('songs', s); render(); renderPlayerHead(); updateMediaSession(); } } },
     { label:'Excluir do aparelho', danger:true, fn:async function(){ if (await confirmBox('Excluir “' + s.title + '”? O áudio e a letra serão apagados deste aparelho.', 'Excluir')) deleteSong(id); } }
   ]));
@@ -1541,7 +1783,7 @@ function addToPlaylistMenu(s){
   actionSheet('Adicionar a uma playlist', acts);
 }
 async function deleteSong(id){
-  var cur = curSong();
+  var cur = curSong(), ds = songById(id), delVersions = ds ? versionsOf(ds).map(function(v){ return v.id; }) : [id];
   if (cur && cur.id === id) {
     audio.pause(); audio.removeAttribute('src'); audio.load();
     if (curUrl) { URL.revokeObjectURL(curUrl); curUrl = null; }
@@ -1555,7 +1797,8 @@ async function deleteSong(id){
     var p = state.playlists[i];
     if (p.songIds.indexOf(id) >= 0) { p.songIds = p.songIds.filter(function(x){ return x !== id; }); await save('playlists', p); }
   }
-  await remove('songs', id); await remove('audio', id);
+  await remove('songs', id);
+  for (var k = 0; k < delVersions.length; k++) { await remove('audio', delVersions[k]); mem.audio.delete(delVersions[k]); }
   toast('Música excluída'); render();
 }
 
@@ -1637,11 +1880,16 @@ $('#pEdit').onclick = function(){
    ] : [])
    .concat([{ label:'Cores do marca-texto', fn:markNamesEditor }, { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }])
    .concat(state.pending.length ? [{ label:'Usar letra importada…', fn:function(){ useImportedLyrics(s); } }] : [])
-   .concat([{ label:'Trocar o áudio…', fn:function(){ swapAudio(s); } }]));
+   .concat([{ label:'Versões (naipe)…', fn:function(){ versionsSheet(s); } }, { label:'Trocar o áudio…', fn:function(){ swapAudio(s, curVersion()); } }]));
 };
 $('#pNotes').onclick = function(){ if (curSong()) notesEditor(curSong()); };
 $('#mkLegend').onclick = markNamesEditor;
 $('#pStage').onclick = enterStage;
+$('#versions').addEventListener('click', function(e){
+  var b = e.target.closest('.ver-chip'); if (!b) return;
+  if (b.dataset.vedit) { var s = curSong(); if (s) versionsSheet(s); return; }
+  switchVersion(b.dataset.vid);
+});
 $('#stExit').onclick = exitStage;
 document.querySelectorAll('.st-edge').forEach(function(b){ b.onclick = function(){ stageSong(+b.dataset.st); }; });
 ['pointerdown','input'].forEach(function(ev){ $('.p-bottom').addEventListener(ev, function(){ if (stageOn() && $('#player').classList.contains('show-ctl')) showStageCtl(true); }, {passive:true}); });
@@ -1767,7 +2015,7 @@ function renderStage(){
   if (!stageOn()) return;
   var s = curSong(), nx = nextTitle();
   $('#stTitle').textContent = s ? s.title : '';
-  $('#stNext').innerHTML = (state.queue.length > 1 ? '<b>' + (state.qi + 1) + ' de ' + state.queue.length + '</b> · ' : '') + (nx ? 'A seguir: ' + esc(nx) : 'Última música');
+  $('#stNext').innerHTML = (state.queue.length > 1 ? '<b>' + (state.qi + 1) + ' de ' + state.queue.length + '</b> · ' : '') + (hasVersions(s) ? '<b>' + esc(curVersion().name) + '</b> · ' : '') + (nx ? 'A seguir: ' + esc(nx) : 'Última música');
 }
 function enterStage(){
   if (!curSong() || stageOn()) return;
@@ -1899,6 +2147,7 @@ document.addEventListener('keydown', function(e){
     case 'p': case 'P': songStep(-1); break;
     case 'l': case 'L': loopCurrentPart(); break;
     case 'f': case 'F': if (stageOn()) exitStage(); else enterStage(); break;
+    case 'v': case 'V': if (hasVersions(curSong())) cycleVersion(); else done = false; break;
     default: done = false;
   }
   if (done) e.preventDefault();

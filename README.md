@@ -8,6 +8,7 @@ Tudo roda no navegador, sem build nem dependências. Nenhuma música, letra ou a
 
 | Versão | O que mudou |
 | --- | --- |
+| **2.7** | **Versões por naipe** (kits do coral): Tutti, Soprano, Contralto, Tenor, Baixo… como uma música só, com uma letra. Troca de voz no player no mesmo ponto da música, agrupamento automático pelo nome do arquivo e **Meu naipe**. |
 | **2.6** | Importação mais fácil: **Escolher áudio** ao lado de cada letra esperando (arquivo com qualquer nome), **Usar letra importada…** no menu da música e **Trocar o áudio…** sem perder letra, cifras, partes e anotações. A duração aparece assim que o áudio é adicionado. |
 | **2.5** | **Modo palco** (tela cheia só com a letra e a próxima música) e **pedal de virar página / teclado**. Duração total do repertório nas playlists. |
 | **2.4** | **Marca-texto** em versos ou trechos, com nomes para as cores e legenda no player. |
@@ -25,6 +26,7 @@ Tudo roda no navegador, sem build nem dependências. Nenhuma música, letra ou a
 - Playlists com o repertório na ordem do ensaio e a duração total
 - O que acontece ao terminar uma música: pausar, seguir a fila até o fim (padrão), repetir a música ou repetir a fila toda
 - Trocar o áudio de uma música (arquivo errado ou gravação melhor), mantendo letra, cifras, partes, marca-texto e anotações
+- **Versões por naipe** (kits do coral): várias gravações da mesma música (Tutti, Soprano, Contralto, Tenor, Baixo, Piano) com uma letra só. Arquivos como `Ave Maria - Soprano.mp3` são agrupados ao adicionar; no player, os botões de versão trocam a voz no mesmo ponto da música, e **Meu naipe** abre sempre a sua voz
 - Controles na tela de bloqueio e nos fones, quando o celular permite
 
 ### Letras e cifras
@@ -78,6 +80,7 @@ Atalhos para o dia a dia:
 
 - **Verso fora de tempo:** no player, **Sincronizar → Ajustar tempos** (também está no menu **Letra**).
 - **Palavra ou acorde errado:** segure o verso.
+- **Estudar a sua voz no kit do coral:** adicione todos os arquivos do kit de uma vez, toque em **Agrupar** e escolha **Meu naipe** em **⋯ → Versões (naipe)…**.
 - **Ensaiar só o refrão:** marque as partes com **+ Parte** e segure a parte → **Repetir esta parte**.
 - **Tocar ao vivo:** ícone de tela cheia ao lado de **Letra** (modo palco). Pareie o pedal e escolha o que ele faz em **Ajuda → Pedal e teclado**.
 
@@ -106,7 +109,7 @@ Se mudar uma tela do app, vale refazer o print correspondente em `img/tutorial/`
 
 ## Onde ficam os dados
 
-Músicas, letras, anotações e playlists ficam no IndexedDB do navegador, no aparelho e no endereço onde foram criadas. As preferências do aparelho (tema, músicas por página, “ao terminar”, cifras visíveis, nomes das cores e pedal) ficam no `localStorage`.
+Músicas, letras, anotações e playlists ficam no IndexedDB do navegador, no aparelho e no endereço onde foram criadas. As preferências do aparelho (tema, músicas por página, “ao terminar”, cifras visíveis, nomes das cores, pedal e meu naipe) ficam no `localStorage`.
 
 O app limita os áudios a 1 GB (cerca de 100 a 200 músicas em MP3), já que é feito para o repertório em ensaio, não para guardar uma coleção. O fim da aba Músicas mostra quanto foi usado e quanto falta; músicas que passariam do limite não são adicionadas. O limite fica na constante `STORAGE_LIMIT` em `js/app.js`.
 
@@ -187,5 +190,6 @@ Campos:
 - `parts`: início (`t`, em segundos) e nome de cada parte.
 - `marks`: trechos com marca-texto (`a` e `b`: começo e fim no texto; `k`: `y` amarelo, `g` verde, `p` rosa, `b` azul).
 - `markNames`: nomes das cores.
+- `versions`: nomes das versões da música (só informação; os áudios não vão no arquivo).
 
-`parts`, `chords`, `transpose`, `marks` e `markNames` são opcionais: arquivos exportados antes dessas versões continuam importando.
+`parts`, `chords`, `transpose`, `marks`, `markNames` e `versions` são opcionais: arquivos exportados antes dessas versões continuam importando.

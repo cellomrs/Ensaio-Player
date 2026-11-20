@@ -43,6 +43,7 @@
       <button class="icon-btn" id="pStage" aria-label="Modo palco (tela cheia só com a letra)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
       <button class="text-btn" id="pEdit">Letra</button>
     </div>
+    <div class="versions" id="versions" role="group" aria-label="Versão (naipe)" hidden></div>
     <div class="stage-top" id="stageTop" hidden>
       <div class="st-t"><span id="stTitle"></span><span id="stNext"></span></div>
       <button class="icon-btn" id="stExit" aria-label="Sair do modo palco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
@@ -111,6 +112,7 @@
 <input type="file" id="file" accept="audio/*" multiple hidden>
 <input type="file" id="linkFile" accept="audio/*" hidden>
 <input type="file" id="swapFile" accept="audio/*" hidden>
+<input type="file" id="verFile" accept="audio/*" hidden>
 <input type="file" id="lrcFile" accept=".lrc,.txt,text/plain" hidden>
 <input type="file" id="dataFile" accept=".json,application/json,.txt,text/plain" hidden>
 
@@ -167,6 +169,24 @@
 <li><b>Letra</b> (canto de cima): editar ou exportar a letra.</li>
 </ul>
 <p>Ao terminar uma música, a próxima começa sozinha (dá para mudar no ícone ao lado do A–B; veja Ferramentas de ensaio). Com o player aberto e a música tocando, a tela fica acesa. Os controles também aparecem na tela de bloqueio da maioria dos celulares.</p>
+</div></details>
+
+<details><summary>Versões por naipe (kits do coral)</summary><div class="body">
+<p>Recebeu do regente o mesmo arranjo em várias gravações (Tutti, Soprano, Contralto, Tenor, Baixo, Piano)? Guarde tudo como <b>uma música só</b>: uma letra, as mesmas partes, cifras e anotações, e você troca de voz no player sem perder o ponto.</p>
+<h3>Adicionar um kit</h3>
+<ol>
+<li>Toque em <b>Adicionar músicas</b> e escolha todos os arquivos do kit de uma vez.</li>
+<li>Se o naipe estiver no nome do arquivo, como <code>Ave Maria - Soprano.mp3</code>, <code>Ave Maria (Tenor).mp3</code> ou <code>Ave_Maria_Baixo.mp3</code>, o Ensaio pergunta se quer agrupar. Toque em <b>Agrupar</b>.</li>
+<li>Se a música já existe no aparelho (com a letra pronta), os arquivos entram nela como versões.</li>
+</ol>
+<p>Também dá para fazer à mão: menu <b>⋯</b> da música → <b>Versões (naipe)…</b> → <b>Adicionar versão</b>.</p>
+<h3>Estudar</h3>
+<ul>
+<li>No player, os botões logo abaixo do título trocam a versão <b>no mesmo ponto da música</b>, mantendo a repetição da parte ou do A–B. No teclado, a tecla <b>V</b> passa para a próxima versão.</li>
+<li><b>Meu naipe</b> (na janela de versões, ou no botão <b>⋯</b> ao fim dos botões de versão): as músicas com versões já abrem na sua voz.</li>
+<li>Na janela de versões, cada versão pode ser renomeada, ter o áudio trocado ou ser apagada.</li>
+</ul>
+<p>Uma dica de estudo: aprenda com a versão do seu naipe, depois confira com o Tutti e, por fim, cante junto com o Piano ou com outro naipe para testar se já se segura sozinho.</p>
 </div></details>
 
 <details><summary>Partes da música</summary><div class="body">
