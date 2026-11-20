@@ -216,6 +216,25 @@ textarea.field.ln-ta{min-height:5.5rem}
 .naipe-l select{font:inherit;font-weight:400;padding:8px 10px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--text);min-height:40px}
 .kit-list{margin:0 0 10px;padding-left:1.2em;line-height:1.5}
 .kit-list span{color:var(--muted);font-size:.88rem}
+/* Anotações por naipe */
+.lnote.vn b{font-weight:700}
+.lnote.vn.mine{color:var(--text);border-left-color:var(--hl);border-left-width:4px;font-weight:700}
+.line:not(.on):not(.target) .lnote.vn:not(.mine){opacity:.8}
+.vn-list{display:flex;flex-direction:column;gap:6px}
+.vn-row{display:flex;gap:6px;align-items:center}
+.vn-row select{font:inherit;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--text);min-height:44px;max-width:38%}
+.vn-row .field{flex:1;min-width:0;margin:0}
+.vn-add{margin:8px 0 4px;display:inline-block}
+/* Notas iniciais */
+.pitch-big{display:block;width:100%;margin:0 0 8px;min-height:50px;font-size:1rem}
+.pitch-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:8px;margin:6px 0 12px}
+.pitch-b{display:flex;flex-direction:column;align-items:center;gap:2px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px 6px;min-height:58px}
+.pitch-b span{color:var(--hl);font-weight:800;font-size:1.05rem}
+.pitch-edit{margin:0 0 10px}
+.pe-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-top:1px solid var(--line)}
+.pe-k{flex:0 0 92px;font-weight:700}
+.pe-row select{flex:1;min-width:0;font:inherit;padding:8px 6px;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--text);min-height:42px}
+.pk-name{font-weight:700;color:var(--text)!important;overflow-wrap:anywhere}
 .parts{display:flex;gap:8px;overflow-x:auto;padding:2px 0 8px;margin:0 -16px;padding-left:16px;padding-right:16px;scrollbar-width:none;scroll-snap-type:x proximity;scroll-padding:0 16px}
 .parts::-webkit-scrollbar{display:none}
 .part-chip{flex:none;display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:.86rem;font-weight:700;min-height:36px;scroll-snap-align:start;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:pan-x}

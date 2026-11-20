@@ -40,12 +40,14 @@
     <div class="p-top">
       <button class="icon-btn" id="pClose" aria-label="Fechar player"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div class="p-title"><span id="pTitle" class="t"></span><span id="pSub" class="s"></span></div>
+      <button class="icon-btn" id="pPitch" hidden aria-label="Notas iniciais (diapasão)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v7a4 4 0 0 0 8 0V3M12 14v7M9 21h6"/></svg></button>
       <button class="icon-btn" id="pStage" aria-label="Modo palco (tela cheia só com a letra)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
       <button class="text-btn" id="pEdit">Letra</button>
     </div>
     <div class="versions" id="versions" role="group" aria-label="Versão (naipe)" hidden></div>
     <div class="stage-top" id="stageTop" hidden>
       <div class="st-t"><span id="stTitle"></span><span id="stNext"></span></div>
+      <button class="icon-btn" id="stPitch" hidden aria-label="Notas iniciais (diapasão)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3v7a4 4 0 0 0 8 0V3M12 14v7M9 21h6"/></svg></button>
       <button class="icon-btn" id="stExit" aria-label="Sair do modo palco"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></button>
     </div>
     <button class="st-edge prev" data-st="-1" aria-label="Música anterior"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -114,7 +116,7 @@
 <input type="file" id="swapFile" accept="audio/*" hidden>
 <input type="file" id="verFile" accept="audio/*" hidden>
 <input type="file" id="lrcFile" accept=".lrc,.txt,text/plain" hidden>
-<input type="file" id="dataFile" accept=".json,application/json,.txt,text/plain" hidden>
+<input type="file" id="dataFile" accept=".json,application/json,.txt,text/plain,.zip,application/zip" hidden>
 
 <template id="helpTpl">
 <div class="help">
@@ -187,6 +189,21 @@
 <li>Na janela de versões, cada versão pode ser renomeada, ter o áudio trocado ou ser apagada.</li>
 </ul>
 <p>Uma dica de estudo: aprenda com a versão do seu naipe, depois confira com o Tutti e, por fim, cante junto com o Piano ou com outro naipe para testar se já se segura sozinho.</p>
+</div></details>
+
+<details><summary>Para o regente</summary><div class="body">
+<h3>Pacote de ensaio</h3>
+<p>Prepare a playlist do repertório (letra sincronizada, partes, cifras, marca-texto, anotações, notas iniciais e versões por naipe) e mande <b>tudo, com os áudios</b>, num arquivo só.</p>
+<ol>
+<li>Abra a playlist, toque em <b>Opções</b> e em <b>Enviar pacote de ensaio (com áudios)…</b>.</li>
+<li>Toque em <b>Compartilhar</b> (WhatsApp, e-mail, Drive) ou <b>Baixar arquivo</b>.</li>
+<li>Cada coralista abre o Ensaio, toca em <b>Importar dados</b> (fim da aba Músicas) e escolhe o arquivo. A playlist chega pronta para estudar.</li>
+</ol>
+<p>O arquivo é um .zip e tem o tamanho dos áudios (dezenas de MB). Mandar de novo um pacote atualizado substitui as músicas e a playlist, sem duplicar nada.</p>
+<h3>Notas iniciais por naipe</h3>
+<p>Em <b>Letra → Notas iniciais por naipe…</b>, escolha a nota de partida de cada naipe (ou <b>Todos</b>, para começar em uníssono). Aparece o ícone de diapasão no alto do player (e no modo palco): ele toca a <b>minha nota</b> (de acordo com <b>Meu naipe</b>), todas uma a uma e o acorde, ou a de cada naipe.</p>
+<h3>Anotações por naipe</h3>
+<p>Segure o verso e toque em <b>+ Anotação para um naipe</b>: “Tenor: respirar aqui”, “Soprano: piano”. Cada coralista vê a do seu naipe destacada e pode esconder as dos outros em <b>Letra → Esconder anotações de outros naipes</b>.</p>
 </div></details>
 
 <details><summary>Partes da música</summary><div class="body">
@@ -313,7 +330,7 @@
 </div></details>
 
 <details><summary>Onde ficam seus dados</summary><div class="body">
-<p>Tudo fica no navegador deste celular e não aparece em outros aparelhos.</p>
+<p>Tudo fica no navegador deste celular e não aparece em outros aparelhos. Para mandar uma playlist <b>com os áudios</b> para outra pessoa, use o pacote de ensaio (veja “Para o regente”).</p>
 <ul>
 <li><b>Limpar os dados do navegador apaga tudo.</b> Faça antes um backup com <b>Exportar dados</b>.</li>
 <li><b>No iPhone,</b> o Safari pode apagar dados de sites pouco usados. Instalar o Ensaio na tela de início evita isso.</li>

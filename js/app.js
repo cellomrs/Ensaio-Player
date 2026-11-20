@@ -73,6 +73,7 @@ function toast(msg, ms){
   var el = $('#toast'); el.textContent = msg; el.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(function(){ el.classList.remove('show'); }, ms || 2600);
 }
+function hideToast(){ clearTimeout(toastTimer); $('#toast').classList.remove('show'); }
 function songById(id){ return state.songs.find(function(s){ return s.id === id; }); }
 function plById(id){ return state.playlists.find(function(p){ return p.id === id; }); }
 function sortedSongs(){ return state.songs.slice().sort(function(a,b){ return a.title.localeCompare(b.title, 'pt-BR'); }); }
@@ -81,7 +82,7 @@ function lyricStatus(s){
   if (!s.lyrics.length) return 'sem letra';
   return s.lyrics.some(function(l){ return l.t != null; }) ? 'letra sincronizada' : 'letra sem tempos';
 }
-function songSub(s){ return (s.duration ? fmt(s.duration) + ', ' : '') + (hasVersions(s) ? s.versions.length + ' versões, ' : '') + lyricStatus(s) + (s.notes || s.lyrics.some(function(l){ return l.note; }) ? ', com observações' : ''); }
+function songSub(s){ return (s.duration ? fmt(s.duration) + ', ' : '') + (hasVersions(s) ? s.versions.length + ' versões, ' : '') + lyricStatus(s) + (s.notes || s.lyrics.some(function(l){ return l.note || (l.vnotes && l.vnotes.length); }) ? ', com observações' : ''); }
 
 /* ---------- Letras ---------- */
 var STAMP_RE = /^\s*\[(\d{1,3}):(\d{1,2}(?:[.:]\d{1,3})?)\]/;
@@ -275,6 +276,120 @@ function markNamesEditor(){
     closeModal(); if (curSong()) renderLyrics();
   };
 }
+/* ---------- Anotações por naipe ({ k: naipe, text }) ---------- */
+var NAIPE_NOTE = ['Soprano', 'Mezzo', 'Contralto', 'Tenor', 'Barítono', 'Baixo'];
+function othersHidden(){ try { return localStorage.getItem('ensaio-vnotes') === 'mine'; } catch(e){ return false; } }
+function hasVnotes(s){ return !!s && s.lyrics.some(function(l){ return l.vnotes && l.vnotes.length; }); }
+function vnotesHtml(l){
+  if (!l.vnotes || !l.vnotes.length) return '';
+  var my = myNaipe() ? naipeKey(myNaipe()) : '', hide = my && othersHidden();
+  return l.vnotes.map(function(v){
+    var mine = my && naipeKey(v.k) === my;
+    if (hide && !mine) return '';
+    return '<span class="lnote vn' + (mine ? ' mine' : '') + '"><b>' + esc(v.k) + ':</b> ' + esc(v.text) + '</span>';
+  }).join('');
+}
+function cleanVnotes(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(v){ return v && typeof v.k === 'string' && v.k.trim() && typeof v.text === 'string' && v.text.trim(); }).slice(0, 8)
+    .map(function(v){ return { k:v.k.trim().slice(0, 20), text:v.text.trim().slice(0, 200) }; });
+}
+function vnRow(k, text){
+  var opts = NAIPE_NOTE.slice(); if (k && opts.indexOf(k) < 0) opts.push(k);
+  return '<div class="vn-row"><select class="vn-k" aria-label="Naipe">' + opts.map(function(n){ return '<option' + (n === k ? ' selected' : '') + '>' + esc(n) + '</option>'; }).join('') + '</select>' +
+    '<input class="field vn-t" maxlength="200" placeholder="Ex.: respirar aqui" autocomplete="off" value="' + esc(text || '') + '">' +
+    '<button type="button" class="icon-btn small" data-vndel="1" aria-label="Tirar esta anotação">' + ICON.x + '</button></div>';
+}
+
+/* ---------- Notas iniciais por naipe (diapasão) ---------- */
+var PITCH_KEYS = ['Todos', 'Soprano', 'Mezzo', 'Contralto', 'Tenor', 'Barítono', 'Baixo'];
+var PITCH_NAMES = { C:'Dó', D:'Ré', E:'Mi', F:'Fá', G:'Sol', A:'Lá', B:'Si' };
+var PITCH_LIST = (function(){ var out = [], ns = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B']; for (var o = 2; o <= 5; o++) ns.forEach(function(n){ out.push(n + o); }); out.push('C6'); return out; })();
+var PITCH_RE = /^([A-G])(#?)([2-6])$/;
+function pitchLabel(n){ var m = PITCH_RE.exec(n); return m ? PITCH_NAMES[m[1]] + (m[2] ? '♯' : '') + m[3] : n; }
+function pitchFreq(n){
+  var m = PITCH_RE.exec(n); if (!m) return 440;
+  var midi = 12 * (+m[3] + 1) + ['C','','D','','E','F','','G','','A','','B'].indexOf(m[1]) + (m[2] ? 1 : 0);
+  return 440 * Math.pow(2, (midi - 69) / 12);
+}
+function cleanPitches(arr){
+  if (!Array.isArray(arr)) return [];
+  return arr.filter(function(p){ return p && PITCH_KEYS.indexOf(p.k) >= 0 && PITCH_RE.test(p.n); }).slice(0, 7).map(function(p){ return { k:p.k, n:p.n }; });
+}
+function hasPitches(s){ return !!(s && s.pitches && s.pitches.length); }
+var actx = null;
+function playTones(freqs, when, dur){
+  try { if (!actx) actx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e){ toast('Este aparelho não toca notas'); return; }
+  if (actx.state === 'suspended') actx.resume();
+  var t0 = actx.currentTime + (when || 0), out = actx.createGain();
+  out.gain.value = 0.32 / Math.max(1, freqs.length * 0.75);
+  out.connect(actx.destination);
+  freqs.forEach(function(f){
+    [[1, 'triangle', 1], [2, 'sine', 0.25]].forEach(function(h){
+      var o = actx.createOscillator(), g = actx.createGain();
+      o.type = h[1]; o.frequency.value = f * h[0];
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(h[2], t0 + 0.03);
+      g.gain.setValueAtTime(h[2], t0 + dur - 0.25);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.connect(g); g.connect(out); o.start(t0); o.stop(t0 + dur + 0.05);
+    });
+  });
+}
+function playPitch(n){ playTones([pitchFreq(n)], 0, 1.6); }
+function playAllPitches(s){
+  var ps = (s.pitches || []).filter(function(p){ return p.k !== 'Todos'; });
+  if (!ps.length) ps = s.pitches || [];
+  ps.forEach(function(p, i){ playTones([pitchFreq(p.n)], i * 0.85, 0.8); });
+  if (ps.length > 1) playTones(ps.map(function(p){ return pitchFreq(p.n); }), ps.length * 0.85 + 0.1, 2.4);
+}
+function myPitch(s){
+  var my = myNaipe(); if (!hasPitches(s)) return null;
+  var p = my && s.pitches.find(function(x){ return naipeKey(x.k) === naipeKey(my); });
+  return p || s.pitches.find(function(x){ return x.k === 'Todos'; }) || null;
+}
+function pitchSheet(s){
+  if (!hasPitches(s)) { pitchEditor(s); return; }
+  var mine = myPitch(s);
+  modal('<h2>Notas iniciais</h2><p>' + esc(s.title) + '</p>' +
+    (mine ? '<button class="btn pitch-big" data-pn="' + mine.n + '">▶ ' + (mine.k === 'Todos' ? 'Nota inicial' : 'Minha nota (' + esc(mine.k) + ')') + ': ' + pitchLabel(mine.n) + '</button>' : '') +
+    (s.pitches.length > 1 ? '<button class="btn sec pitch-big" data-pall="1">▶ Todas, uma a uma, e o acorde</button>' : '') +
+    '<div class="pitch-grid">' + s.pitches.map(function(p){ return '<button class="pitch-b" data-pn="' + p.n + '"><b>' + esc(p.k) + '</b><span>' + pitchLabel(p.n) + '</span></button>'; }).join('') + '</div>' +
+    '<div class="m-actions"><button class="btn ghost" data-m="edit">Editar notas</button><span class="grow"></span><button class="btn" data-m="x">Pronto</button></div>');
+  $('#sheet').onclick = function(e){
+    var b = e.target.closest('[data-pn],[data-pall],[data-m]'); if (!b) return;
+    if (b.dataset.pn) { playPitch(b.dataset.pn); return; }
+    if (b.dataset.pall) { playAllPitches(s); return; }
+    if (b.dataset.m === 'edit') { pitchEditor(s); return; }
+    closeModal();
+  };
+}
+function pitchEditor(s){
+  var cur = {}; (s.pitches || []).forEach(function(p){ cur[p.k] = p.n; });
+  modal('<h2>Notas iniciais de “' + esc(s.title) + '”</h2><p>A nota de partida de cada naipe, para dar o tom antes de começar. Use <b>Todos</b> quando o coro começa em uníssono.</p>' +
+    '<div class="pitch-edit">' + PITCH_KEYS.map(function(k){
+      return '<div class="pe-row"><span class="pe-k">' + k + '</span><select data-pk="' + k + '" aria-label="Nota inicial: ' + k + '"><option value="">—</option>' +
+        PITCH_LIST.map(function(n){ return '<option value="' + n + '"' + (cur[k] === n ? ' selected' : '') + '>' + pitchLabel(n) + ' (' + n + ')</option>'; }).join('') +
+        '</select><button type="button" class="icon-btn small" data-pplay="' + k + '" aria-label="Ouvir">▶</button></div>';
+    }).join('') + '</div>' +
+    '<div class="m-actions"><span class="grow"></span><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>');
+  $('#sheet').onclick = async function(e){
+    var pb = e.target.closest('[data-pplay]');
+    if (pb) { var v = document.querySelector('#sheet select[data-pk="' + pb.dataset.pplay + '"]').value; if (v) playPitch(v); else toast('Escolha a nota primeiro'); return; }
+    var b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'ok') {
+      var ps = [];
+      document.querySelectorAll('#sheet select[data-pk]').forEach(function(sel){ if (sel.value) ps.push({ k:sel.dataset.pk, n:sel.value }); });
+      if (ps.length) s.pitches = ps; else delete s.pitches;
+      await saveSong(s); toast(ps.length ? 'Notas iniciais salvas' : 'Notas iniciais apagadas');
+      closeModal(); if (curSong() === s) renderPitchBtn();
+      return;
+    }
+    closeModal();
+  };
+}
+function renderPitchBtn(){ var on = hasPitches(curSong()); $('#pPitch').hidden = !on; $('#stPitch').hidden = !on; }
+
 function chordsOn(){ try { return localStorage.getItem('ensaio-chords') !== 'off'; } catch(e){ return true; } }
 function chordsHtml(l, n){
   var ch = l.chords.slice().sort(function(a, b){ return a.i - b.i; }), text = l.text, out = '';
@@ -499,7 +614,7 @@ function renderPlayerHead(){
   $('#pTitle').textContent = s ? s.title : 'Nada tocando';
   $('#pSub').textContent = s ? (state.qi+1) + ' de ' + state.queue.length + ', ' + state.queueName : '';
 }
-function renderPlayer(){ renderPlayerHead(); renderVersions(); renderNotes(); renderLyrics(); renderTools(); setPlayIcons(); renderStage(); }
+function renderPlayer(){ renderPlayerHead(); renderVersions(); renderNotes(); renderLyrics(); renderTools(); setPlayIcons(); renderStage(); renderPitchBtn(); }
 
 /* ---------- Partes da música (Intro, Verso, Refrão…) ---------- */
 var PART_NAMES = ['Intro', 'Verso', 'Pré-refrão', 'Refrão', 'Ponte', 'Solo', 'Final'];
@@ -658,7 +773,7 @@ function renderLyrics(){
       var tag = tags[i] ? '<div class="part-tag">' + esc(tags[i]) + '</div>' : '';
       if (!l.text && !ch) return tag + (l.chords && l.chords.length ? '' : '<div class="gap"></div>');
       return tag + '<div class="line' + (l.t != null ? ' timed' : '') + (ch ? ' has-ch' + (l.text ? '' : ' ch-line') : '') + '" data-act="line" data-i="' + i + '">' +
-        (ch ? chordsHtml(l, tr) : markedHtml(l.text, l.marks)) + (l.note ? '<span class="lnote">' + esc(l.note) + '</span>' : '') + '</div>';
+        (ch ? chordsHtml(l, tr) : markedHtml(l.text, l.marks)) + (l.note ? '<span class="lnote">' + esc(l.note) + '</span>' : '') + vnotesHtml(l) + '</div>';
     }).join('') + '<p class="lhint">Segure um verso para corrigir o texto' + (hasChords(s) ? ', os acordes' : '') + ' ou escrever uma anotação.</p><div class="spacer"></div>';
   if (state.sync || state.adjust) markTarget();
   renderLegend();
@@ -1049,6 +1164,8 @@ function notesEditor(s){
   };
 }
 function carryNotes(oldL, newL){
+  var vpool = oldL.filter(function(l){ return l.vnotes && l.vnotes.length; }).map(function(l){ return { text:l.text, vnotes:l.vnotes }; });
+  newL.forEach(function(l){ var k = vpool.findIndex(function(p){ return p.text === l.text; }); if (k >= 0) { l.vnotes = vpool[k].vnotes; vpool.splice(k, 1); } });
   var mpool = oldL.filter(function(l){ return l.marks && l.marks.length; }).map(function(l){ return { text:l.text, marks:l.marks }; });
   newL.forEach(function(l){
     var k = mpool.findIndex(function(p){ return p.text === l.text; });
@@ -1077,6 +1194,9 @@ function lineEditor(s, i){
     '<div class="mk-prev" id="mkPrev" aria-live="polite"></div>' +
     '<label class="m-lbl" for="lnTxt">Anotação <span>(opcional)</span></label>' +
     '<textarea class="field notes-ta ln-ta" id="lnTxt" maxlength="200" placeholder="Ex.: entra a segunda voz"></textarea>' +
+    '<span class="m-lbl">Anotações por naipe <span>(opcional)</span></span>' +
+    '<div class="vn-list" id="vnList">' + (l.vnotes || []).map(function(v){ return vnRow(v.k, v.text); }).join('') + '</div>' +
+    '<button type="button" class="link-btn vn-add" data-vnadd="1">+ Anotação para um naipe</button>' +
     '<div class="m-actions"><button class="btn ghost" data-m="del" aria-label="Apagar verso">Apagar</button><span class="grow"></span>' +
     '<button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Salvar</button></div>');
   $('#lvTxt').value = joinChords(l.text, l.chords); $('#lnTxt').value = l.note || '';
@@ -1095,6 +1215,11 @@ function lineEditor(s, i){
   /* Tocar na cor não pode tirar a seleção do campo */
   document.querySelectorAll('#sheet .mk-btn').forEach(function(bt){ ['pointerdown','mousedown'].forEach(function(ev){ bt.addEventListener(ev, function(e){ e.preventDefault(); }); }); });
   $('#sheet').onclick = async function(e){
+    if (e.target.closest('[data-vnadd]')) {
+      $('#vnList').insertAdjacentHTML('beforeend', vnRow(NAIPE_NOTE.indexOf(prettyNaipe(myNaipe())) >= 0 ? prettyNaipe(myNaipe()) : 'Soprano', ''));
+      var ins = document.querySelectorAll('#vnList .vn-t'); ins[ins.length - 1].focus(); return;
+    }
+    var vd = e.target.closest('[data-vndel]'); if (vd) { vd.closest('.vn-row').remove(); return; }
     var mk = e.target.closest('[data-mk]');
     if (mk) {
       syncWork();
@@ -1116,6 +1241,8 @@ function lineEditor(s, i){
       l.text = sc.text; if (sc.chords.length) l.chords = sc.chords; else delete l.chords;
       if (mks.length) l.marks = mks; else delete l.marks;
       if (note) l.note = note; else delete l.note;
+      var vns = cleanVnotes([].map.call(document.querySelectorAll('#vnList .vn-row'), function(r){ return { k:r.querySelector('.vn-k').value, text:r.querySelector('.vn-t').value }; }));
+      if (vns.length) l.vnotes = vns; else delete l.vnotes;
       closeModal();
       try { await save('songs', s); toast('Verso salvo'); } catch(err){ toast('Não foi possível salvar o verso'); }
     } else if (m === 'del') {
@@ -1216,6 +1343,7 @@ function cleanLyrics(arr){
         .map(function(c){ return { i: Math.max(0, Math.min(o.text.length, Math.round(c.i))), c: c.c.trim().slice(0, 12) }; });
       if (cs.length) o.chords = cs;
     }
+    var vn = cleanVnotes(l.vnotes); if (vn.length) o.vnotes = vn;
     if (Array.isArray(l.marks)) {
       var ms = paintMarks(l.marks.filter(function(m){ return m && MARK_COLORS[m.k] && typeof m.a === 'number' && typeof m.b === 'number'; })
         .map(function(m){ return { a:Math.round(m.a), b:Math.round(m.b), k:m.k }; }), o.text.length, 0, 0, '');
@@ -1230,13 +1358,16 @@ function cleanParts(arr){
     .map(function(p){ return { t: +p.t.toFixed(2), name: p.name.trim().slice(0, 30) }; }).sort(function(a, b){ return a.t - b.t; });
 }
 function cleanTranspose(n){ n = Math.round(+n); return isFinite(n) && n >= -11 && n <= 11 ? n : 0; }
+function songExport(s){
+  var o = { title:s.title, notes:s.notes || '', duration:s.duration || null, lyrics:cleanLyrics(s.lyrics), parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose), pitches:cleanPitches(s.pitches) };
+  if (hasVersions(s)) o.versions = s.versions.map(function(v){ return v.name; });
+  return o;
+}
 function buildExport(){
   var songs = state.songs.map(function(s){
-    var o = { title:s.title, notes:s.notes || '', duration:s.duration || null, lyrics:cleanLyrics(s.lyrics), parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose) };
-    if (hasVersions(s)) o.versions = s.versions.map(function(v){ return v.name; });
-    return o;
+    return songExport(s);
   }).concat(state.pending.map(function(p){
-    return { title:p.title, notes:p.notes || '', duration:p.duration || null, lyrics:cleanLyrics(p.lyrics), parts:cleanParts(p.parts), transpose:cleanTranspose(p.transpose) };
+    return { title:p.title, notes:p.notes || '', duration:p.duration || null, lyrics:cleanLyrics(p.lyrics), parts:cleanParts(p.parts), transpose:cleanTranspose(p.transpose), pitches:cleanPitches(p.pitches) };
   }));
   var playlists = state.playlists.map(function(p){
     var order = p.songIds.map(function(id){ var s = songById(id); return s ? s.title : null; }).filter(Boolean);
@@ -1292,7 +1423,7 @@ function parseImport(text){
     songs: data.songs.filter(function(s){ return s && typeof s.title === 'string' && s.title.trim(); }).map(function(s){
       return { title:s.title.trim().slice(0, 120), notes: typeof s.notes === 'string' ? s.notes.slice(0, 1000) : '',
         duration: typeof s.duration === 'number' && isFinite(s.duration) ? s.duration : null, lyrics:cleanLyrics(s.lyrics),
-        parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose) };
+        parts:cleanParts(s.parts), transpose:cleanTranspose(s.transpose), pitches:cleanPitches(s.pitches) };
     }),
     playlists: (Array.isArray(data.playlists) ? data.playlists : []).filter(function(p){ return p && typeof p.name === 'string' && p.name.trim() && Array.isArray(p.songs); }).map(function(p){
       return { name:p.name.trim().slice(0, 120), songs:p.songs.filter(function(t){ return typeof t === 'string' && t.trim(); }) };
@@ -1337,13 +1468,14 @@ async function importData(text){
     for (var i = 0; i < found.length; i++) {
       var src = found[i], s = match[normTitle(src.title)];
       s.lyrics = src.lyrics; s.notes = src.notes; s.parts = src.parts;
+      if (src.pitches.length) s.pitches = src.pitches; else delete s.pitches;
       if (src.transpose) s.transpose = src.transpose; else delete s.transpose;
       if (!s.duration && src.duration) s.duration = src.duration;
       await save('songs', s);
     }
     for (var j = 0; j < missing.length; j++) {
       var m = missing[j], pid = normTitle(m.title);
-      var pend = { id:pid, title:m.title, lyrics:m.lyrics, notes:m.notes, duration:m.duration, parts:m.parts, transpose:m.transpose };
+      var pend = { id:pid, title:m.title, lyrics:m.lyrics, notes:m.notes, duration:m.duration, parts:m.parts, transpose:m.transpose, pitches:m.pitches };
       await save('pending', pend);
       state.pending = state.pending.filter(function(p){ return p.id !== pid; }).concat([pend]);
     }
@@ -1374,6 +1506,7 @@ async function applyPending(song, forced){
   if (p) k = normTitle(p.title);
   if (p) {
     song.title = p.title; song.lyrics = p.lyrics || []; song.notes = p.notes || ''; song.parts = p.parts || [];
+    if (p.pitches && p.pitches.length) song.pitches = p.pitches; else delete song.pitches;
     if (p.transpose) song.transpose = p.transpose; else delete song.transpose;
     if (!song.duration && p.duration) song.duration = p.duration;
     await save('songs', song);
@@ -1397,6 +1530,10 @@ async function applyPending(song, forced){
 }
 $('#dataFile').addEventListener('change', async function(e){
   var f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  try {
+    var head = new Uint8Array(await f.slice(0, 4).arrayBuffer());
+    if (head[0] === 0x50 && head[1] === 0x4B) { await importPack(f); return; }
+  } catch(err) { toast('Não foi possível ler o pacote'); return; }
   if (f.size > 20 * 1048576) { toast('Arquivo grande demais para ser de dados do Ensaio'); return; }
   try { await importData(await f.text()); } catch(err){ toast('Não foi possível ler o arquivo'); }
 });
@@ -1663,6 +1800,193 @@ function askKits(kits){
   });
 }
 
+/* ---------- Pacote de ensaio: uma playlist com dados e áudios num arquivo .zip ---------- */
+var CRC_T = null;
+async function crc32(u8){
+  if (!CRC_T) { CRC_T = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; CRC_T[n] = c >>> 0; } }
+  var crc = 0xFFFFFFFF, CH = 4194304;
+  for (var i = 0; i < u8.length; i += CH) {
+    var end = Math.min(u8.length, i + CH);
+    for (var j = i; j < end; j++) crc = CRC_T[(crc ^ u8[j]) & 0xFF] ^ (crc >>> 8);
+    if (end < u8.length) await new Promise(function(r){ setTimeout(r, 0); });
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+/* ZIP sem compressão (áudio já é comprimido), legível por qualquer descompactador */
+async function makeZip(entries){
+  var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+  for (var i = 0; i < entries.length; i++) {
+    var e = entries[i], nm = enc.encode(e.name), crc = await crc32(e.data), size = e.data.length;
+    var lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(6, 0x0800, true); lh.setUint16(8, 0, true);
+    lh.setUint16(10, 0, true); lh.setUint16(12, 0x21, true); lh.setUint32(14, crc, true); lh.setUint32(18, size, true); lh.setUint32(22, size, true);
+    lh.setUint16(26, nm.length, true); lh.setUint16(28, 0, true);
+    parts.push(lh.buffer, nm, e.data);
+    var ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(8, 0x0800, true); ch.setUint16(10, 0, true);
+    ch.setUint16(12, 0, true); ch.setUint16(14, 0x21, true); ch.setUint32(16, crc, true); ch.setUint32(20, size, true); ch.setUint32(24, size, true);
+    ch.setUint16(28, nm.length, true); ch.setUint32(42, offset, true);
+    central.push(ch.buffer, nm);
+    offset += 30 + nm.length + size;
+  }
+  var cdSize = central.reduce(function(n, b){ return n + b.byteLength; }, 0), end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, entries.length, true); end.setUint16(10, entries.length, true);
+  end.setUint32(12, cdSize, true); end.setUint32(16, offset, true);
+  return new Blob(parts.concat(central, [end.buffer]), { type:'application/zip' });
+}
+function readZip(buf){
+  var dv = new DataView(buf), u8 = new Uint8Array(buf), e = -1, files = {}, dec = new TextDecoder();
+  for (var i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+  if (e < 0) throw new Error('não é zip');
+  var n = dv.getUint16(e + 10, true), p = dv.getUint32(e + 16, true);
+  for (var k = 0; k < n; k++) {
+    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error('zip inválido');
+    var method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true), nlen = dv.getUint16(p + 28, true),
+        xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), off = dv.getUint32(p + 42, true);
+    var name = dec.decode(u8.subarray(p + 46, p + 46 + nlen));
+    var start = off + 30 + dv.getUint16(off + 26, true) + dv.getUint16(off + 28, true);
+    files[name] = { method:method, data:u8.subarray(start, start + csize) };
+    p += 46 + nlen + xlen + clen;
+  }
+  return files;
+}
+async function zipData(f){
+  if (!f) throw new Error('faltando');
+  if (f.method === 0) return f.data;
+  if (f.method === 8 && window.DecompressionStream) return new Uint8Array(await new Response(new Blob([f.data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+  throw new Error('compressão não suportada');
+}
+function audioExt(type){
+  type = String(type || '');
+  if (/mpeg|mp3/.test(type)) return 'mp3'; if (/mp4|m4a|aac/.test(type)) return 'm4a'; if (/wav/.test(type)) return 'wav';
+  if (/ogg|opus/.test(type)) return 'ogg'; if (/webm/.test(type)) return 'webm'; if (/flac/.test(type)) return 'flac';
+  return 'audio';
+}
+function downloadFile(name, blob){
+  var url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+}
+async function exportPack(p){
+  var songs = p.songIds.map(songById).filter(Boolean);
+  if (!songs.length) { toast('A playlist está vazia'); return; }
+  toast('Montando o pacote…', 60000);
+  var entries = [], meta = [], nAudio = 0;
+  try {
+    for (var i = 0; i < songs.length; i++) {
+      var s = songs[i], o = songExport(s), vs = versionsOf(s);
+      delete o.versions; o.audio = [];
+      for (var j = 0; j < vs.length; j++) {
+        var a = await loadAudio(vs[j].id); if (!a || !a.buf) continue;
+        var fn = 'audio/' + (i + 1) + '-' + (j + 1) + '.' + audioExt(a.type);
+        entries.push({ name:fn, data:new Uint8Array(a.buf) }); nAudio++;
+        o.audio.push({ name: vs.length > 1 ? vs[j].name : 'Original', file:fn, type:a.type || 'audio/mpeg', duration: vDuration(s, vs[j]) || null });
+      }
+      meta.push(o);
+    }
+    var data = { app:'ensaio', kind:'pacote', version:1, exportedAt:new Date().toISOString(), markNames:cleanMarkNames(markNames()),
+      playlist:{ name:p.name, songs:songs.map(function(x){ return x.title; }) }, songs:meta };
+    entries.unshift({ name:'ensaio.json', data:new TextEncoder().encode(JSON.stringify(data, null, 1)) });
+    var blob = await makeZip(entries);
+  } catch(err) { toast('Não foi possível montar o pacote'); return; }
+  hideToast();
+  packSheet('Ensaio - ' + safeName(p.name) + '.zip', blob, songs.length, nAudio);
+}
+function packSheet(name, blob, nSongs, nAudio){
+  var file = null, canShare = false;
+  try { file = new File([blob], name, { type:'application/zip' }); canShare = !!(navigator.canShare && navigator.canShare({ files:[file] })); } catch(e){}
+  modal('<h2>Pacote de ensaio pronto</h2><p class="pk-name">' + esc(name) + ' · ' + fmtSize(blob.size) + '</p>' +
+    '<p>' + nSongs + (nSongs === 1 ? ' música' : ' músicas') + ' e ' + nAudio + (nAudio === 1 ? ' gravação' : ' gravações') + ', com a letra sincronizada, as partes, as cifras, o marca-texto, as anotações e as notas iniciais.</p>' +
+    '<p>Mande para o coro pelo WhatsApp, e-mail ou Drive. Quem receber abre o Ensaio e toca em <b>Importar dados</b>, no fim da aba Músicas, e escolhe este arquivo.</p>' +
+    '<div class="m-actions"><button class="btn ghost" data-m="x">Fechar</button><span class="grow"></span>' +
+    '<button class="btn' + (canShare ? ' sec' : '') + '" data-m="dl">Baixar arquivo</button>' + (canShare ? '<button class="btn" data-m="share">Compartilhar</button>' : '') + '</div>');
+  $('#sheet').onclick = function(e){
+    var b = e.target.closest('[data-m]'); if (!b) return;
+    if (b.dataset.m === 'x') { closeModal(); return; }
+    if (b.dataset.m === 'share') navigator.share({ files:[file], title:name }).then(function(){ toast('Pacote compartilhado'); })
+      .catch(function(err){ if (!err || err.name !== 'AbortError') toast('Não deu para compartilhar daqui. Use Baixar arquivo.'); });
+    else { try { downloadFile(name, blob); toast('Pacote baixado'); } catch(err){ toast('Não foi possível baixar o pacote'); } }
+  };
+}
+async function importPack(file){
+  toast('Lendo o pacote…', 60000);
+  var files, data;
+  try {
+    files = readZip(await file.arrayBuffer());
+    data = JSON.parse(new TextDecoder().decode(await zipData(files['ensaio.json'])));
+  } catch(err) { toast('Este arquivo não é um pacote de ensaio do Ensaio'); return; }
+  if (!data || data.app !== 'ensaio' || data.kind !== 'pacote' || !Array.isArray(data.songs)) { toast('Este arquivo não é um pacote de ensaio do Ensaio'); return; }
+  var songs = data.songs.filter(function(s){ return s && typeof s.title === 'string' && s.title.trim() && Array.isArray(s.audio); }).map(function(s){
+    return { title:s.title.trim().slice(0, 120), notes: typeof s.notes === 'string' ? s.notes.slice(0, 1000) : '', lyrics:cleanLyrics(s.lyrics), parts:cleanParts(s.parts),
+      transpose:cleanTranspose(s.transpose), pitches:cleanPitches(s.pitches),
+      audio: s.audio.filter(function(a){ return a && typeof a.file === 'string' && files[a.file]; }).slice(0, 12).map(function(a){
+        return { name: typeof a.name === 'string' && a.name.trim() ? a.name.trim().slice(0, 30) : 'Original', file:a.file, type: typeof a.type === 'string' ? a.type : 'audio/mpeg', size:files[a.file].data.length };
+      }) };
+  }).filter(function(s){ return s.audio.length; });
+  if (!songs.length) { toast('O pacote não tem músicas com áudio'); return; }
+  var match = matchSongs(songs.map(function(s){ return s.title; }));
+  var existing = songs.filter(function(s){ return match[normTitle(s.title)]; });
+  var need = songs.reduce(function(n, s){ return n + s.audio.reduce(function(m, a){ return m + a.size; }, 0); }, 0);
+  var freed = existing.reduce(function(n, s){ var o = match[normTitle(s.title)]; return n + (o.size || 0) + (o.versions || []).reduce(function(m, v){ return m + (v.id !== o.id ? (v.size || 0) : 0); }, 0); }, 0);
+  var nAudio = songs.reduce(function(n, s){ return n + s.audio.length; }, 0);
+  var plName = data.playlist && typeof data.playlist.name === 'string' ? data.playlist.name.trim().slice(0, 120) : '';
+  var plOld = plName && state.playlists.find(function(x){ return normTitle(x.name) === normTitle(plName); });
+  hideToast();
+  if (usedBytes() - freed + need > STORAGE_LIMIT) { toast('O pacote tem ' + fmtSize(need) + ' de áudio e não cabe no limite de ' + fmtSize(STORAGE_LIMIT) + ' (faltam ' + fmtSize(freeBytes()) + '). Exclua músicas que saíram do repertório.', 8000); return; }
+  var ok = await new Promise(function(res){
+    modal('<h2>Pacote de ensaio</h2>' + (plName ? '<p class="pk-name">“' + esc(plName) + '”</p>' : '') + '<ul class="imp-sum">' +
+      '<li><b>' + songs.length + (songs.length === 1 ? ' música' : ' músicas') + '</b> com ' + nAudio + (nAudio === 1 ? ' gravação' : ' gravações') + ' (' + fmtSize(need) + '), prontas para estudar: letra, partes, cifras, anotações e notas iniciais.</li>' +
+      (existing.length ? '<li><b>' + existing.length + '</b> ' + (existing.length === 1 ? 'já está' : 'já estão') + ' no aparelho: letra, anotações e gravações serão substituídas pelas do pacote.</li>' : '') +
+      (plName ? '<li>A playlist <b>' + esc(plName) + '</b> ' + (plOld ? 'será atualizada' : 'será criada') + ' com a ordem do pacote.</li>' : '') +
+      '</ul><div class="m-actions"><button class="btn sec" data-m="x">Cancelar</button><button class="btn" data-m="ok">Importar</button></div>', function(){ res(false); });
+    $('#sheet').onclick = function(e){ var b = e.target.closest('[data-m]'); if (!b) return; closeModal(); res(b.dataset.m === 'ok'); };
+  });
+  if (!ok) return;
+  if (state.sync) finishSync(true);
+  if (state.adjust) finishAdjust(true);
+  var ids = [], cur = curSong(), curReplaced = false;
+  try {
+    for (var i = 0; i < songs.length; i++) {
+      var src = songs[i], s = match[normTitle(src.title)];
+      toast('Guardando ' + (i + 1) + ' de ' + songs.length + '…', 60000);
+      if (s) {
+        if (s === cur) { audio.pause(); curReplaced = true; }
+        var old = versionsOf(s).map(function(v){ return v.id; });
+        for (var k = 0; k < old.length; k++) { await remove('audio', old[k]); mem.audio.delete(old[k]); }
+      } else { s = { id:uid(), title:src.title, lyrics:[], added:Date.now() }; state.songs.push(s); }
+      s.title = src.title; s.lyrics = src.lyrics; s.notes = src.notes; s.parts = src.parts;
+      if (src.transpose) s.transpose = src.transpose; else delete s.transpose;
+      if (src.pitches.length) s.pitches = src.pitches; else delete s.pitches;
+      var vers = [];
+      for (var j = 0; j < src.audio.length; j++) {
+        var a = src.audio[j], bytes = await zipData(files[a.file]), id = j === 0 ? s.id : uid();
+        var ab = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), rec = { id:id, buf:ab, type:a.type };
+        if (db) await save('audio', rec); else mem.audio.set(id, rec);
+        var nm = a.name, base = nm, c = 2; while (vers.some(function(v){ return normTitle(v.name) === normTitle(nm); })) nm = base + ' ' + c++;
+        vers.push({ id:id, name:nm, size:ab.byteLength, duration:await probeDuration(ab, a.type) });
+      }
+      s.size = vers[0].size; s.duration = vers[0].duration;
+      if (vers.length > 1) s.versions = vers; else delete s.versions;
+      await save('songs', s); ids.push(s.id);
+      var pk = normTitle(s.title), pend = state.pending.find(function(x){ return x.id === pk; });
+      if (pend) { state.pending = state.pending.filter(function(x){ return x !== pend; }); await remove('pending', pend.id); }
+    }
+    var pl = null;
+    if (plName) {
+      pl = plOld || { id:uid(), name:plName, songIds:[] };
+      if (!plOld) state.playlists.push(pl);
+      pl.songIds = ids; delete pl.pendingTitles;
+      await save('playlists', pl);
+    }
+    var mnIn = cleanMarkNames(data.markNames);
+    if (Object.keys(mnIn).length) { var mn = markNames(); Object.keys(mnIn).forEach(function(k){ mn[k] = mnIn[k]; }); setMarkNames(mn); }
+  } catch(err) { toast('O pacote não pôde ser importado por completo. Confira o espaço do aparelho.', 6000); render(); return; }
+  if (curReplaced) { state.vid = null; await playAt(state.qi, true); }
+  if (pl) { state.openPl = pl.id; state.view = 'playlist'; }
+  render();
+  toast('Pacote importado: ' + songs.length + (songs.length === 1 ? ' música pronta' : ' músicas prontas') + ' para estudar', 4000);
+}
+
 /* Trocar o áudio de uma música, mantendo letra, cifras, partes, marcas e playlists */
 var swapTarget = null, swapVer = null;
 function swapAudio(s, v){ swapTarget = s; swapVer = v || (curSong() === s ? curVersion() : versionsOf(s)[0]); $('#swapFile').value = ''; $('#swapFile').click(); }
@@ -1842,6 +2166,7 @@ document.addEventListener('click', async function(e){
     case 'plsong': if (p) playQueue(p.songIds, i, p.name); break;
     case 'pladd': if (!p) break; var picked = await pickSongs(p.songIds); if (picked) { p.songIds = picked; await save('playlists', p); render(); } break;
     case 'plmore': if (!p) break; actionSheet(p.name, [
+      { label:'Enviar pacote de ensaio (com áudios)…', fn:function(){ exportPack(p); } },
       { label:'Renomear playlist', fn:async function(){ var n = await askText('Renomear playlist', p.name, 'Salvar'); if (n) { if (state.queueName === p.name) state.queueName = n; p.name = n; await save('playlists', p); render(); renderPlayerHead(); } } },
       { label:'Excluir playlist', danger:true, fn:async function(){ if (await confirmBox('Excluir a playlist “' + p.name + '”? As músicas continuam no aparelho.', 'Excluir')) { state.playlists = state.playlists.filter(function(x){ return x.id !== p.id; }); await remove('playlists', p.id); state.view = 'playlists'; render(); } } }
     ]); break;
@@ -1878,6 +2203,9 @@ $('#pEdit').onclick = function(){
      { label:'Tom: transpor' + (s.transpose ? ' (' + (s.transpose > 0 ? '+' : '−') + Math.abs(s.transpose) + ')' : ''), fn:function(){ transposeSheet(s); } },
      { label: chordsOn() ? 'Esconder cifras' : 'Mostrar cifras', fn:toggleChords }
    ] : [])
+   .concat([{ label: hasPitches(s) ? 'Notas iniciais (diapasão)…' : 'Notas iniciais por naipe…', fn:function(){ pitchSheet(s); } }])
+   .concat(hasVnotes(s) && myNaipe() ? [{ label: othersHidden() ? 'Mostrar anotações de outros naipes' : 'Esconder anotações de outros naipes', fn:function(){
+     try { localStorage.setItem('ensaio-vnotes', othersHidden() ? 'all' : 'mine'); } catch(_){} renderLyrics(); toast(othersHidden() ? 'Só as anotações do seu naipe' : 'Anotações de todos os naipes'); } }] : [])
    .concat([{ label:'Cores do marca-texto', fn:markNamesEditor }, { label:'Exportar letra (.lrc)', fn:function(){ exportLrc(s); } }])
    .concat(state.pending.length ? [{ label:'Usar letra importada…', fn:function(){ useImportedLyrics(s); } }] : [])
    .concat([{ label:'Versões (naipe)…', fn:function(){ versionsSheet(s); } }, { label:'Trocar o áudio…', fn:function(){ swapAudio(s, curVersion()); } }]));
@@ -1885,6 +2213,7 @@ $('#pEdit').onclick = function(){
 $('#pNotes').onclick = function(){ if (curSong()) notesEditor(curSong()); };
 $('#mkLegend').onclick = markNamesEditor;
 $('#pStage').onclick = enterStage;
+$('#pPitch').onclick = $('#stPitch').onclick = function(){ var s = curSong(); if (s) pitchSheet(s); };
 $('#versions').addEventListener('click', function(e){
   var b = e.target.closest('.ver-chip'); if (!b) return;
   if (b.dataset.vedit) { var s = curSong(); if (s) versionsSheet(s); return; }

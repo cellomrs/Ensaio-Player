@@ -8,6 +8,7 @@ Tudo roda no navegador, sem build nem dependências. Nenhuma música, letra ou a
 
 | Versão | O que mudou |
 | --- | --- |
+| **2.8** | Para o regente: **pacote de ensaio** (playlist com dados e áudios num .zip, que o coro importa pronto), **notas iniciais por naipe** (diapasão no player) e **anotações por naipe**. |
 | **2.7** | **Versões por naipe** (kits do coral): Tutti, Soprano, Contralto, Tenor, Baixo… como uma música só, com uma letra. Troca de voz no player no mesmo ponto da música, agrupamento automático pelo nome do arquivo e **Meu naipe**. |
 | **2.6** | Importação mais fácil: **Escolher áudio** ao lado de cada letra esperando (arquivo com qualquer nome), **Usar letra importada…** no menu da música e **Trocar o áudio…** sem perder letra, cifras, partes e anotações. A duração aparece assim que o áudio é adicionado. |
 | **2.5** | **Modo palco** (tela cheia só com a letra e a próxima música) e **pedal de virar página / teclado**. Duração total do repertório nas playlists. |
@@ -52,6 +53,12 @@ Tudo roda no navegador, sem build nem dependências. Nenhuma música, letra ou a
 - **Modo palco**: tela cheia só com a letra bem grande (com cifras e marca-texto), a posição na fila e a próxima música no alto. Toque na letra para mostrar os controles; toque nas bordas para trocar de música, que fica pronta, sem tocar, para a banda entrar junto. Tocar ou segurar um verso não faz nada, para evitar toques sem querer, e a tela fica acesa mesmo com a música parada
 - **Pedal de virar página (Bluetooth) e teclado**: os dois botões do pedal podem ir de parte em parte, tocar/pausar ou trocar de música. Atalhos: Espaço (tocar/pausar), ← → (5 s), Shift + ← → ou P/N (música), L (repetir a parte), F (modo palco) e ? (lista de atalhos)
 
+### Para o regente
+
+- **Pacote de ensaio**: em **Opções** da playlist, **Enviar pacote de ensaio (com áudios)…** gera um .zip com tudo (letra sincronizada, partes, cifras, marca-texto, anotações, notas iniciais, versões por naipe e os áudios). O coralista abre em **Importar dados** e recebe a playlist pronta. Reenviar um pacote atualizado substitui, sem duplicar
+- **Notas iniciais por naipe**: a nota de partida de cada naipe (ou de todos, em uníssono). O ícone de diapasão no player toca a minha nota (Meu naipe), todas uma a uma e o acorde
+- **Anotações por naipe** no verso (“Tenor: respirar aqui”): cada coralista vê a do seu naipe destacada e pode esconder as dos outros
+
 ### Anotações
 
 - Observações gerais por música (tom, capotraste, estrutura), sempre à vista no player
@@ -81,6 +88,7 @@ Atalhos para o dia a dia:
 - **Verso fora de tempo:** no player, **Sincronizar → Ajustar tempos** (também está no menu **Letra**).
 - **Palavra ou acorde errado:** segure o verso.
 - **Estudar a sua voz no kit do coral:** adicione todos os arquivos do kit de uma vez, toque em **Agrupar** e escolha **Meu naipe** em **⋯ → Versões (naipe)…**.
+- **Mandar o repertório para o coro:** playlist → **Opções** → **Enviar pacote de ensaio**. O coro importa em **Importar dados**.
 - **Ensaiar só o refrão:** marque as partes com **+ Parte** e segure a parte → **Repetir esta parte**.
 - **Tocar ao vivo:** ícone de tela cheia ao lado de **Letra** (modo palco). Pareie o pedal e escolha o que ele faz em **Ajuda → Pedal e teclado**.
 
@@ -115,7 +123,7 @@ O app limita os áudios a 1 GB (cerca de 100 a 200 músicas em MP3), já que é 
 
 - Limpar os dados do navegador apaga tudo. Antes, use **Exportar dados** (fim da aba Músicas).
 - No iPhone, o Safari pode apagar dados de sites pouco usados. Instalar o app na tela de início evita isso.
-- Os dados não passam sozinhos de um endereço para outro nem de um celular para outro. Para levar tudo, use **Exportar dados** e depois **Importar dados** no destino, e adicione os áudios (com os mesmos nomes de arquivo ou escolhendo cada um em **Escolher áudio**).
+- Os dados não passam sozinhos de um endereço para outro nem de um celular para outro. Para levar tudo, use **Exportar dados** e depois **Importar dados** no destino, e adicione os áudios (com os mesmos nomes de arquivo ou escolhendo cada um em **Escolher áudio**). Para levar uma playlist **com os áudios**, use o pacote de ensaio.
 
 ## Estrutura do projeto
 
@@ -146,6 +154,8 @@ img/
 - Media Session API para os controles na tela de bloqueio
 - Screen Wake Lock API para manter a tela acesa
 - Fullscreen API para o modo palco, e eventos de teclado para o pedal
+- Web Audio API para as notas iniciais (diapasão), sem arquivos de som
+- ZIP gerado e lido pelo próprio app (CRC32 e, para pacotes recompactados, DecompressionStream)
 - Web Share API para compartilhar o arquivo .lrc e o arquivo de dados
 - Web App Manifest e Service Worker para instalar e usar sem internet
 - Fontes: Atkinson Hyperlegible e Bricolage Grotesque, via Google Fonts (guardadas pelo service worker no primeiro acesso)
@@ -191,5 +201,11 @@ Campos:
 - `marks`: trechos com marca-texto (`a` e `b`: começo e fim no texto; `k`: `y` amarelo, `g` verde, `p` rosa, `b` azul).
 - `markNames`: nomes das cores.
 - `versions`: nomes das versões da música (só informação; os áudios não vão no arquivo).
+- `pitches`: notas iniciais (`k`: naipe ou `Todos`; `n`: nota, como `F#3`).
+- `vnotes` (no verso): anotações por naipe (`k`: naipe; `text`).
 
-`parts`, `chords`, `transpose`, `marks`, `markNames` e `versions` são opcionais: arquivos exportados antes dessas versões continuam importando.
+### Pacote de ensaio (.zip)
+
+Um ZIP comum (sem compressão, porque o áudio já é comprimido) com `ensaio.json` e a pasta `audio/`. O `ensaio.json` tem `"kind": "pacote"`, a `playlist` (nome e ordem) e, em cada música, os mesmos campos do arquivo de dados mais `audio`: a lista de gravações (`name` da versão, `file` dentro do ZIP, `type`, `duration`). O app também lê pacotes recompactados com compressão (deflate).
+
+`parts`, `chords`, `transpose`, `marks`, `markNames`, `versions`, `pitches` e `vnotes` são opcionais: arquivos exportados antes dessas versões continuam importando.
